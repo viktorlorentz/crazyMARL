@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import os
-import argparse
 import numpy as np
 import tensorflow as tf
 import jax
@@ -63,19 +62,6 @@ os.environ["MUJOCO_GL"] = "egl"
 os.makedirs(env_cache, exist_ok=True)
 os.environ["XLA_CACHE_DIR"] = env_cache
 jax.config.update("jax_compilation_cache_dir", env_cache)
-
-#------------------------------------------------------------------------------
-def parse_args():
-    p = argparse.ArgumentParser(
-        description="Run a multiquad rollout with a TFLite actor, save to ASDF, and render video"
-    )
-    p.add_argument("--model_path", type=str, default="actor_model.tflite", help="Path to TFLite actor model")
-    p.add_argument("--num_envs", type=int, default=100, help="Number of parallel environments")
-    p.add_argument("--timesteps", type=int, default=4000, help="Number of simulation steps")
-    p.add_argument("--output", type=str, default="flights.crazy.asdf", help="ASDF output filename")
-    p.add_argument("--video", type=str, default="rollout_video.mp4", help="Rendered video filename")
-    p.add_argument("--experiment_name", type=str, default="experiment", help="Experiment name prefix")
-    return p.parse_args()
 
 #------------------------------------------------------------------------------
 def load_model(model_path: str) -> tf.lite.Interpreter:
@@ -172,7 +158,7 @@ def run_single_rollout(interpreter: tf.lite.Interpreter, env, env_config: dict):
     return states
 
 #------------------------------------------------------------------------------
-def save_rollout(obs_h, act_h, rew_h, done_h, args, num_envs, agents, env_config):
+def save_rollout(obs_h, act_h, rew_h, done_h, model_path, output, num_envs, agents, env_config):
     agents_dict = {
         agents[i]: {"observations": obs_h[:, :, i, :], "actions": act_h[:, :, i, :]}
         for i in range(len(agents))
@@ -189,7 +175,7 @@ def save_rollout(obs_h, act_h, rew_h, done_h, args, num_envs, agents, env_config
                 "num_envs": num_envs,
                 "timesteps": obs_h.shape[0],
                 "agents": agents,
-                "model_path": args.model_path,
+                "model_path": model_path,
                 "env": "multiquad_ix4",
                 "env_config": env_config,          
             },
@@ -201,11 +187,11 @@ def save_rollout(obs_h, act_h, rew_h, done_h, args, num_envs, agents, env_config
             },
         }]
     }
-    asdf.AsdfFile(tree).write_to(args.output)
-    print(f"Saved ASDF to {args.output}")
+    asdf.AsdfFile(tree).write_to(output)
+    print(f"Saved ASDF to {output}")
 
 
-def figure_eight(length, width=1.0, height=1.0, rounds=1, z= np.array([1.5])):
+def figure_eight(length, width=1.0, height=1.0, rounds=1, z = np.array([1.5])):
     """
     Generate a figure-eight trajectory.
 
@@ -269,8 +255,7 @@ def record_experiment(
     )
     save_rollout(
         obs_h, act_h, rew_h, done_h,
-        argparse.Namespace(model_path=model_path, output=asdf_file),
-        num_envs, agents, env_config
+        model_path, asdf_file, num_envs, agents, env_config
     )
 
     # Single-env rollout + render
@@ -291,7 +276,6 @@ def record_experiment(
 
 
 def main():
-    args = parse_args()
 
     default_config = {
         "policy_freq": 250.0,              # Policy frequency in Hz.
@@ -308,20 +292,57 @@ def main():
 
 
     
-    two_quads_figure_eight_config = {
+    figure_eight_config = {
         **default_config,
         "episode_length": 5000,
         "trajectory": figure_eight(5000),
-        "num_quads": 2,
         "target_start_ratio": 1.0,  # Start at the target position
     }
 
-    record_experiment(
-        experiment_name="2_quads_figure_eight",
-        model_path=args.model_path,
-        num_envs=100,
-        env_config=two_quads_figure_eight_config,
-    )
+    recovery_config = {
+        **default_config,
+        "episode_length": 2500,
+        "trajectory": np.array([0,0,1.5]), # Single target position
+        "target_start_ratio": 0.0,  # Start randomly, not at target
+    }
+
+    quad_ovverrides = { 
+        1: {
+            "num_quads": 1,
+        },
+        2: {
+            "num_quads": 2,
+        },
+        3: {
+            "num_quads": 3,
+        },
+        # 5: {
+        #     "num_quads": 5,
+        #     "payload_mass": 0.05,  # Increase payload mass for more quads
+        # },
+    }
+
+    for num_quads, overrides in quad_ovverrides.items():
+        # construct model path for this quad count
+        model_path = f"trained_policies/{num_quads}_quad_policy.tflite"
+
+        # figure‐eight experiment
+        fe_config = {**figure_eight_config, **overrides}
+        record_experiment(
+            experiment_name=f"{num_quads}_quads_figure_eight",
+            model_path=model_path,
+            num_envs=100,
+            env_config=fe_config
+        )
+
+        # recovery experiment
+        rec_config = {**recovery_config, **overrides}
+        record_experiment(
+            experiment_name=f"{num_quads}_quads_recovery",
+            model_path=model_path,
+            num_envs=1000,
+            env_config=rec_config
+        )
  
 if __name__ == "__main__":
     main()
