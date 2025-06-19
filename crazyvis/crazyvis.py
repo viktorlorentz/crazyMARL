@@ -10,6 +10,7 @@ import asdf
 import imageio
 import mujoco  # for OpenGL context
 import datetime
+import shutil
 
 #------------------------------------------------------------------------------
 # Vendored batchify / unbatchify (no external deps)
@@ -32,7 +33,7 @@ def unbatchify(x: jnp.ndarray, agent_list, num_envs, num_actors):
 
 #------------------------------------------------------------------------------
 # Rendering utility
-def render_video(pipeline_states, env, render_every=10, width=1920, height=1080, output="rollout_video.mp4"):    
+def render_video(pipeline_states, env, fps=25, width=1920, height=1080, output="rollout_video.mp4"):    
     ctx = mujoco.GLContext(width, height)
     ctx.make_current()
     # Prepare directories for images
@@ -46,6 +47,9 @@ def render_video(pipeline_states, env, render_every=10, width=1920, height=1080,
     png_name = os.path.join(images_dir, os.path.splitext(os.path.basename(output))[0] + "_first_frame.png")
     imageio.imwrite(png_name, first_frame)
     print(f"First frame saved to {png_name}")
+    # calculate render_every based on fps and env.dt
+    render_every = int(np.round(1.0 / (env.dt * fps)))  
+
     frames = env.render(pipeline_states[::render_every], camera="track", width=width, height=height)
     fps = float(1.0 / (env.dt * render_every))
     imageio.mimsave(output, frames, fps=fps)
@@ -79,9 +83,10 @@ def load_model(model_path: str) -> tf.lite.Interpreter:
     return interpreter
 
 #------------------------------------------------------------------------------
-def run_batched_rollout(interpreter: tf.lite.Interpreter, env, num_envs: int, timesteps: int):
+def run_batched_rollout(interpreter: tf.lite.Interpreter, env, num_envs: int, env_config: dict):
     agents = env.agents
     obs_dim = env.observation_spaces[agents[0]].shape[0]
+    timesteps = env_config["episode_length"]
 
     interpreter.resize_tensor_input(
         interpreter.get_input_details()[0]["index"], [num_envs, obs_dim]
@@ -131,9 +136,10 @@ def run_batched_rollout(interpreter: tf.lite.Interpreter, env, num_envs: int, ti
     )
 
 #------------------------------------------------------------------------------
-def run_single_rollout(interpreter: tf.lite.Interpreter, env, timesteps: int):
+def run_single_rollout(interpreter: tf.lite.Interpreter, env, env_config: dict):
     agents = env.agents
     obs_dim = env.observation_spaces[agents[0]].shape[0]
+    timesteps = env_config["episode_length"]
 
     interpreter.resize_tensor_input(
         interpreter.get_input_details()[0]["index"], [1, obs_dim]
@@ -166,31 +172,40 @@ def run_single_rollout(interpreter: tf.lite.Interpreter, env, timesteps: int):
     return states
 
 #------------------------------------------------------------------------------
-def save_rollout(obs_h, act_h, rew_h, done_h, args, num_envs, agents, trajectory=None):
+def save_rollout(obs_h, act_h, rew_h, done_h, args, num_envs, agents, env_config):
     agents_dict = {
         agents[i]: {"observations": obs_h[:, :, i, :], "actions": act_h[:, :, i, :]}
         for i in range(len(agents))
     }
     tree = {
-        "metadata": {"num_envs": num_envs, "timesteps": obs_h.shape[0], "agent_names": agents},
+        "metadata": {
+            "num_envs": num_envs,
+            "timesteps": obs_h.shape[0],
+            "agent_names": agents,
+        },
         "environment": {"name": "multiquad_ix4"},
         "flights": [{
-            "metadata": {"num_envs": num_envs, 
-                         "timesteps": obs_h.shape[0], 
-                         "agents": agents,
-                        "model_path": args.model_path,
-                           "dt": 1.0/250,
-                           "env": "multiquad_ix4"
-                           },
+            "metadata": {
+                "num_envs": num_envs,
+                "timesteps": obs_h.shape[0],
+                "agents": agents,
+                "model_path": args.model_path,
+                "env": "multiquad_ix4",
+                "env_config": env_config,          
+            },
             "agents": agents_dict,
-            "global": {"rewards": rew_h, "dones": done_h, "trajectory": trajectory},
+            "global": {
+                "rewards": rew_h,
+                "dones": done_h,
+                "trajectory": env_config.get("trajectory")  # keep trajectory field
+            },
         }]
     }
     asdf.AsdfFile(tree).write_to(args.output)
     print(f"Saved ASDF to {args.output}")
 
 
-def figure_eight(length, width=1.0, height=1.0, rounds=1):
+def figure_eight(length, width=1.0, height=1.0, rounds=1, z= np.array([1.5])):
     """
     Generate a figure-eight trajectory.
 
@@ -201,53 +216,114 @@ def figure_eight(length, width=1.0, height=1.0, rounds=1):
     - rounds:   number of complete figure-8 loops over the span.
 
     Returns:
-    - x, y: arrays of shape (length,) giving the trajectory.
+    - path:        a numpy array of shape (length, 3) representing the trajectory in 3D space.
     """
     # directly sample the parameter from 0 to 2π·rounds
     t = np.linspace(0, 2 * np.pi * rounds, length)
     x = width * np.sin(t)
     y = height * np.sin(2 * t)
 
-    return x, y
+    #expand z to match the shape of x and y if not already same length
+    if z.shape[0] == 1:
+        z = np.full_like(x, z[0])
+    elif z.shape[0] != length:
+        raise ValueError(f"z must be of length 1 or {length}, got {len(z)}")
+    
+    return np.column_stack((x, y, z))
+
+
+   
+    
+    
 
 #------------------------------------------------------------------------------
-def main():
-    args = parse_args()
-    # Create experiment directory with timestamp
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    exp_name = f"{args.experiment_name}_{timestamp}"
-    base_dir = os.path.join("experiments", exp_name)
+def record_experiment(
+    experiment_name: str,
+    model_path: str,
+    num_envs: int,
+    env_config: dict,
+):
+    # prepare experiment directory
+    timestamp = datetime.datetime.now().strftime("_%Y%m%d_%H%M%S")
+    base_dir = os.path.join("experiments", experiment_name + timestamp)
     for sub in ["videos", "images", "plots", "policies"]:
         os.makedirs(os.path.join(base_dir, sub), exist_ok=True)
-    # Update output paths to use experiment subdirectories
-    args.output = os.path.join(base_dir, os.path.basename(args.output))
-    args.video = os.path.join(base_dir, "videos", os.path.basename(args.video))
-    interpreter = load_model(args.model_path)
 
-    x, y = figure_eight(args.timesteps, width=1.0, height=1.0, rounds=1)
-    traj = np.stack([x, y, 1.5 * np.ones_like(x)], axis=-1)
+    # copy policy file into policies folder
+    policy_dest = os.path.join(base_dir, "policies", os.path.basename(model_path))
+    shutil.copy(model_path, policy_dest)
+    print(f"Copied policy file to {policy_dest}")
 
-    env_config = {
-        "episode_length": args.timesteps,
-        "trajectory": traj,
-        "num_quads": 2,  # assuming 4 quadrotors
-        "trajectory": traj,  # use the figure-eight trajectory
-    }
+    # derive filenames from experiment_name
+    asdf_file = os.path.join(base_dir, f"{experiment_name}.crazy.asdf")
+    video_file = os.path.join(base_dir, "videos", f"{experiment_name}.mp4")
+
+    interpreter = load_model(model_path)
+
     print(f"Creating environment with config: {env_config}")
-
     env = jaxmarl.make("multiquad_ix4", **env_config)
 
-    # Batched rollout: collect and save data
-    obs_h, act_h, rew_h, done_h, agents = run_batched_rollout(interpreter, env, args.num_envs, args.timesteps)
-    save_rollout(obs_h, act_h, rew_h, done_h, args, args.num_envs, agents, trajectory=traj)
+    # Batched rollout and save
+    obs_h, act_h, rew_h, done_h, agents = run_batched_rollout(
+        interpreter, env, num_envs, env_config
+    )
+    save_rollout(
+        obs_h, act_h, rew_h, done_h,
+        argparse.Namespace(model_path=model_path, output=asdf_file),
+        num_envs, agents, env_config
+    )
 
-    # Single-env rollout for rendering
+    # Single-env rollout + render
     print("Running single-env rollout for rendering...")
-    states = run_single_rollout(interpreter, env, args.timesteps)
-    render_video(states, env, render_every=10, width=1920, height=1080, output=args.video)
+    states = run_single_rollout(interpreter, env, env_config)
+    render_video(states, env, width=1920, height=1080, output=video_file)
 
+    # print list of all files created
+    print("Experiment files created:")
+    print(f"  Experiment directory: {base_dir}")
+    print(f"  ASDF file: {asdf_file}")
+    print(f"  Video file: {video_file}")
+
+    # return the directory for further processing if needed
+    return base_dir
+
+
+
+
+def main():
+    args = parse_args()
+
+    default_config = {
+        "policy_freq": 250.0,              # Policy frequency in Hz.
+        "sim_steps_per_action": 1,         # Physics steps between control actions.
+        "obs_noise": 0.0,                  # Parameter for observation noise
+        "act_noise": 0.0,                  # Parameter for actuator noise
+        "max_thrust_range": 0.2,           # Range for randomizing thrust
+        "num_quads": 2,
+        "cable_length": 0.4,               # Length of the cable connecting the payload to the quadrotors.
+        "trajectory": None,                # Array of target positions for the payload
+        "target_start_ratio": 0.2,         # Percentage of resets to target position
+        "payload_mass": 0.01,              # Mass of the payload.
+    }
+
+
+    
+    two_quads_figure_eight_config = {
+        **default_config,
+        "episode_length": 5000,
+        "trajectory": figure_eight(5000),
+        "num_quads": 2,
+        "target_start_ratio": 1.0,  # Start at the target position
+    }
+
+    record_experiment(
+        experiment_name="2_quads_figure_eight",
+        model_path=args.model_path,
+        num_envs=100,
+        env_config=two_quads_figure_eight_config,
+    )
+ 
 if __name__ == "__main__":
     main()
-
 
 
