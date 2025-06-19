@@ -10,7 +10,7 @@ from functools import partial
 # from gymnax.environments import environment, spaces
 from gymnax.environments.spaces import Box as BoxGymnax, Discrete as DiscreteGymnax
 from typing import Dict, Optional, List, Tuple, Union
-from jaxmarl.environments.overcooked_v2.common import DynamicObject
+
 from jaxmarl.environments.spaces import Box, Discrete, MultiDiscrete
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv, State
 
