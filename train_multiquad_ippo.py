@@ -88,6 +88,7 @@ def eval_results(eval_env, jit_reset, jit_inference_fn, jit_step):
     
     # Histogram plot over quad actions.
     quad_actions_flat = np.concatenate(quad_actions_list).flatten()
+    quad_actions_flat = 0.5 * (quad_actions_flat + 1)
     plt.figure()
     plt.hist(quad_actions_flat, bins=50)
     plt.xlabel('Action Value')
@@ -113,8 +114,8 @@ def main():
         "taut_reward_coef": 1.0,
         "collision_penalty_coef": -10.0,
         "out_of_bounds_penalty_coef": -10.0,
-        "smooth_action_coef": -2.0,
-        "action_energy_coef": -0.1,
+        "smooth_action_coef": -10.0,
+        "action_energy_coef": -1.0,
     }
     # Build configuration for IPPO training on multiquad_2x4
     config = {
@@ -124,12 +125,12 @@ def main():
             "obs_noise": 0.0,
             "act_noise": 0.0,
             "max_thrust_range": 0.0,
-            "num_quads": 3,
+            "num_quads": 2,
             "episode_length": 1024,
-            "cable_length": 0.4,
-            "payload_mass": 0.025,
+            "cable_length": 0.1,
+            "payload_mass": 0.01,
         },
-        "TOTAL_TIMESTEPS": 3_000_000_000,  #3_000_000_000,
+        "TOTAL_TIMESTEPS": 1_000_000_000,  #3_000_000_000,
         "NUM_ENVS": 16384,
         "NUM_STEPS": 32,
         "NUM_MINIBATCHES": 128,
