@@ -506,7 +506,7 @@ class MultiQuadEnv(PipelineEnv):
     payload_err   = team_obs[:3]
     payload_linlv = team_obs[3:6]
     dis = jp.linalg.norm(payload_err)
-    tracking_reward = self.reward_coeffs["distance_reward_coef"] * er(dis, sim_time)
+    tracking_reward = self.reward_coeffs["distance_reward_coef"] * er(dis)
 
     
     quad_obs = [obs[6 + i*24 : 6 + (i+1)*24] for i in range(self.num_quads)]
