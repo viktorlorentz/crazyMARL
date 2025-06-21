@@ -125,10 +125,10 @@ def main():
             "obs_noise": 0.0,
             "act_noise": 0.0,
             "max_thrust_range": 0.15,
-            "num_quads": 6,
+            "num_quads": 2,
             "episode_length": 2048,
             "cable_length": 0.5,
-            "payload_mass": 0.05,
+            "payload_mass": 0.01,
         },
         "TOTAL_TIMESTEPS": 3_000_000_000, 
         "NUM_ENVS": 8192, # 16384
