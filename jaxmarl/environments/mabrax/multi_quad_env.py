@@ -208,7 +208,8 @@ class MultiQuadEnv(PipelineEnv):
 
     # reset payload position to the target position with a probability
     is_target_start = jax.random.uniform(subkeys[1]) < target_start_ratio
-    payload = jp.where(is_target_start, target_position, payload)
+    payload = jp.where(is_target_start, target_position + jax.random.normal(subkeys[1], (3,)) * 0.02, payload)
+
 
     # spherical params
     mean_r, std_r = cable_length, cable_length/3
@@ -505,7 +506,7 @@ class MultiQuadEnv(PipelineEnv):
     payload_err   = team_obs[:3]
     payload_linlv = team_obs[3:6]
     dis = jp.linalg.norm(payload_err)
-    tracking_reward = self.reward_coeffs["distance_reward_coef"] * er(dis)
+    tracking_reward = self.reward_coeffs["distance_reward_coef"] * er(dis, sim_time)
 
     
     quad_obs = [obs[6 + i*24 : 6 + (i+1)*24] for i in range(self.num_quads)]
