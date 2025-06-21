@@ -131,9 +131,9 @@ def main():
             "payload_mass": 0.01,
         },
         "TOTAL_TIMESTEPS": 3_000_000_000, 
-        "NUM_ENVS": 16384,
-        "NUM_STEPS": 128,
-        "NUM_MINIBATCHES": 128* 32, # Batch size is NUM_ENVS * NUM_STEPS / NUM_MINIBATCHES = 16384 * 128 / 4096 = 512
+        "NUM_ENVS": 8192, # 16384
+        "NUM_STEPS": 256,
+        "NUM_MINIBATCHES": 128, # Batch size is NUM_ENVS * NUM_STEPS / NUM_MINIBATCHES = 16384 * 128 / 4096 = 512
         # "TOTAL_TIMESTEPS": 1_000_000_000,
         # "NUM_ENVS": 2048, # 16384,
         # "NUM_STEPS": 256,
