@@ -109,7 +109,7 @@ def main():
         "safe_distance_coef": 1.0,
         "up_reward_coef": 1.0,
         "linvel_reward_coef": 1.0,
-        "ang_vel_reward_coef": 1.0,
+        "ang_vel_reward_coef": 0.0,
         "linvel_quad_reward_coef": 1.0,
         "taut_reward_coef": 1.0,
         "collision_penalty_coef": -10.0,

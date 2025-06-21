@@ -51,7 +51,7 @@ class MultiQuadEnv(PipelineEnv):
       num_quads = 2,
       cable_length: float = 0.4,  # Length of the cable connecting the payload to the quadrotors.
       trajectory = None,  # array of target positions for the payload
-      target_start_ratio: float = 0.2,  # percentage of resets to target position
+      target_start_ratio: float = 0.1,  # percentage of resets to target position
       payload_mass: float = 0.01,  # Mass of the payload.
       **kwargs,
   ):
@@ -208,7 +208,7 @@ class MultiQuadEnv(PipelineEnv):
 
     # reset payload position to the target position with a probability
     is_target_start = jax.random.uniform(subkeys[1]) < target_start_ratio
-    payload = jp.where(is_target_start, target_position + jax.random.normal(subkeys[1], (3,)) * 0.02, payload)
+    payload = jp.where(is_target_start, target_position, payload)
 
     # spherical params
     mean_r, std_r = cable_length, cable_length/3

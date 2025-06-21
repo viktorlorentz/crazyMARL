@@ -307,15 +307,15 @@ def main():
     }
 
     quad_ovverrides = { 
-        1: {
-            "num_quads": 1,
-        },
+        # 1: {
+        #     "num_quads": 1,
+        # },
         2: {
             "num_quads": 2,
         },
-        3: {
-            "num_quads": 3,
-        },
+        # 3: {
+        #     "num_quads": 3,
+        # },
         # 5: {
         #     "num_quads": 5,
         #     "payload_mass": 0.05,  # Increase payload mass for more quads
