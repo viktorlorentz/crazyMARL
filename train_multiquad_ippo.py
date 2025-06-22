@@ -131,10 +131,10 @@ def main():
             "payload_mass": 0.01,
             "policy_freq": 100,
         },
-        "TOTAL_TIMESTEPS": 100_000_000, 
+        "TOTAL_TIMESTEPS": 500_000_000, 
         "NUM_ENVS": 8192, # 16384
         "NUM_STEPS": 64,
-        "NUM_MINIBATCHES": 128, # Batch size is NUM_ENVS * NUM_STEPS / NUM_MINIBATCHES = 16384 * 128 / 4096 = 512
+        "NUM_MINIBATCHES": 256, # Batch size is NUM_ENVS * NUM_STEPS / NUM_MINIBATCHES = 16384 * 128 / 4096 = 512
         # "TOTAL_TIMESTEPS": 1_000_000_000,
         # "NUM_ENVS": 2048, # 16384,
         # "NUM_STEPS": 256,
@@ -150,7 +150,7 @@ def main():
         "GAMMA": 0.995,
         "GAE_LAMBDA": 0.95,
         "SEED": 0,
-        "ACTOR_ARCH": [64, 64, 64],
+        "ACTOR_ARCH": [64, 64],
         "CRITIC_ARCH": [128, 128, 128],
         "DISABLE_JIT": False,
         "PROJECT": "single_quad_rl",
