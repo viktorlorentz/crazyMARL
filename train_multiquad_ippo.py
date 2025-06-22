@@ -129,12 +129,12 @@ def main():
             "episode_length": 2048,
             "cable_length": 0.3,
             "payload_mass": 0.01,
-            "policy_freq": 100,
+            "policy_freq": 500,
         },
         "TOTAL_TIMESTEPS": 500_000_000, 
-        "NUM_ENVS": 8192, # 16384
-        "NUM_STEPS": 64,
-        "NUM_MINIBATCHES": 256, # Batch size is NUM_ENVS * NUM_STEPS / NUM_MINIBATCHES = 16384 * 128 / 4096 = 512
+        "NUM_ENVS": 16384, # 16384
+        "NUM_STEPS": 32,
+        "NUM_MINIBATCHES": 128, # Batch size is NUM_ENVS * NUM_STEPS / NUM_MINIBATCHES = 16384 * 128 / 4096 = 512
         # "TOTAL_TIMESTEPS": 1_000_000_000,
         # "NUM_ENVS": 2048, # 16384,
         # "NUM_STEPS": 256,
