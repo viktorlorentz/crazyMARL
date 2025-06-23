@@ -231,7 +231,7 @@ def record_experiment(
 ):
     # prepare experiment directory
     timestamp = datetime.datetime.now().strftime("_%Y%m%d_%H%M%S")
-    base_dir = os.path.join("experiments", experiment_name + timestamp)
+    base_dir = os.path.join("experiments_data", experiment_name + timestamp)
     for sub in ["videos", "images", "plots", "policies"]:
         os.makedirs(os.path.join(base_dir, sub), exist_ok=True)
 
