@@ -80,4 +80,4 @@ def calc_reward(
 
     reward = tracking_reward * (stability + safety)
   
-    return reward, None, {}
+    return reward
