@@ -21,6 +21,5 @@ training:
     episode_length: 2048
     cable_length: 0.3
     payload_mass: 0.01
-    policy_freq: 500
   TOTAL_TIMESTEPS: 1000000000
   

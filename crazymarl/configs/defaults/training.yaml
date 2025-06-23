@@ -21,11 +21,11 @@ training:
     episode_length: 2048
     cable_length: 0.3
     payload_mass: 0.01
-    policy_freq: 500
+    policy_freq: 250
   TOTAL_TIMESTEPS: 1000000
   NUM_ENVS: 16384
-  NUM_STEPS: 128
-  NUM_MINIBATCHES: 256
+  NUM_STEPS: 32
+  NUM_MINIBATCHES: 128
   UPDATE_EPOCHS: 8
   ANNEAL_LR: false
   LR: 0.0004
