@@ -139,6 +139,8 @@ def main(config_file=None):
     # Deep-merge wandb overrides into the default config (preserve defaults)
     config = deep_merge(config, dict(wandb.config))
 
+    print("Timesteps:", config["training"]["TOTAL_TIMESTEPS"])
+
     # terminate if num_steps*num_envs is too large, because of the GPU memory
     if config["NUM_STEPS"] * config["NUM_ENVS"] > 2048*2048:
         raise ValueError("NUM_STEPS * NUM_ENVS is too large. Please reduce them.")
