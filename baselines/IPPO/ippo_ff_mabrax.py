@@ -8,7 +8,11 @@ import jax.numpy as jnp
 import flax.linen as nn
 import numpy as np
 import optax
-from flax.linen.initializers import constant, orthogonal
+from flax.linen.initializers import (
+    glorot_uniform,
+    zeros,
+    constant
+)
 from typing import Sequence, NamedTuple, Any
 from flax.training.train_state import TrainState
 import distrax
@@ -31,31 +35,52 @@ class ActorModule(nn.Module):
     activation: str = "tanh"
     actor_arch: Sequence[int] = None
 
-
     @nn.compact
     def __call__(self, x):
+        # Select activation
         act_fn = nn.relu if self.activation == "relu" else nn.tanh
         a = x
+        # Hidden layers: Xavier (GlorotUniform) for tanh
         for h in self.actor_arch or [128, 64, 64]:
-            a = nn.Dense(h, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(a)
+            a = nn.Dense(
+                h,
+                kernel_init=glorot_uniform(),  # balances variance for tanh
+                bias_init=zeros
+            )(a)
             a = act_fn(a)
-        actor_mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(a)
+        # Output layer: zero-mean initialization for neutral start
+        actor_mean = nn.Dense(
+            self.action_dim,
+            kernel_init=zeros,  # zero weights
+            bias_init=zeros    # zero bias
+        )(a)
         return actor_mean
+
 
 class CriticModule(nn.Module):
     activation: str = "tanh"
     critic_arch: Sequence[int] = None
 
-
     @nn.compact
     def __call__(self, x):
         act_fn = nn.relu if self.activation == "relu" else nn.tanh
         c = x
+        # Hidden layers: Xavier init
         for h in self.critic_arch or [128, 128, 128, 128]:
-            c = nn.Dense(h, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(c)
+            c = nn.Dense(
+                h,
+                kernel_init=glorot_uniform(),  # balances variance for tanh
+                bias_init=zeros
+            )(c)
             c = act_fn(c)
-        c = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(c)
+        # Final value head
+        c = nn.Dense(
+            1,
+            kernel_init=glorot_uniform(),  # small scale for critic output
+            bias_init=zeros
+        )(c)
         return jnp.squeeze(c, axis=-1)
+
 
 class ActorCritic(nn.Module):
     action_dim: int
