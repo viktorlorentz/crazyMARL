@@ -36,7 +36,7 @@ def angle_between(v1: jp.ndarray, v2: jp.ndarray, eps: float = 1e-6) -> jp.ndarr
 
 
 @jit
-def upright_angles(rots: jnp.ndarray, eps: float = 1e-6) -> jnp.ndarray:
+def upright_angles(rots: jp.ndarray, eps: float = 1e-6) -> jp.ndarray:
     """
     Compute the angle between each quad's local up-axis (3rd column of R) 
     and the global z-axis, in radians.
@@ -53,6 +53,6 @@ def upright_angles(rots: jnp.ndarray, eps: float = 1e-6) -> jnp.ndarray:
     # Extract cos(theta) = R[2,2] (dot with [0,0,1])
     cos_theta = R[:, 2, 2]
     # Clip for numerical stability
-    cos_theta = jnp.clip(cos_theta, -1.0 + eps, 1.0 - eps)
+    cos_theta = jp.clip(cos_theta, -1.0 + eps, 1.0 - eps)
     # Return angle
-    return jnp.arccos(cos_theta)
+    return jp.arccos(cos_theta)
