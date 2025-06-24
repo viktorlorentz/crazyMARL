@@ -3,13 +3,28 @@ from jax import jit
 
 @jit
 def R_from_quat(q: jp.ndarray) -> jp.ndarray:
-    """Compute a 3×3 rotation matrix from a quaternion [w, x, y, z]."""
-    q = q / jp.linalg.norm(q)
-    w, x, y, z = q
-    r1 = jp.array([1 - 2*(y*y + z*z), 2*(x*y - z*w),   2*(x*z + y*w)])
-    r2 = jp.array([2*(x*y + z*w),   1 - 2*(x*x + z*z), 2*(y*z - x*w)])
-    r3 = jp.array([2*(x*z - y*w),   2*(y*z + x*w),     1 - 2*(x*x + y*y)])
-    return jp.stack([r1, r2, r3])
+    """Compute rotation matrix(ices) from quaternion(s) [w, x, y, z].
+       Supports q shape (4,) or (...,4) and returns (...,3,3)."""
+    # normalize over last dim
+    q = q / jp.linalg.norm(q, axis=-1, keepdims=True)
+    w = q[..., 0]; x = q[..., 1]; y = q[..., 2]; z = q[..., 3]
+    r1 = jp.stack([
+        1 - 2*(y*y + z*z),
+        2*(x*y - z*w),
+        2*(x*z + y*w)
+    ], axis=-1)
+    r2 = jp.stack([
+        2*(x*y + z*w),
+        1 - 2*(x*x + z*z),
+        2*(y*z - x*w)
+    ], axis=-1)
+    r3 = jp.stack([
+        2*(x*z - y*w),
+        2*(y*z + x*w),
+        1 - 2*(x*x + y*y)
+    ], axis=-1)
+    # stack rows into matrix, preserving batch dims
+    return jp.stack([r1, r2, r3], axis=-2)
 
 
 @jit
@@ -36,23 +51,20 @@ def angle_between(v1: jp.ndarray, v2: jp.ndarray, eps: float = 1e-6) -> jp.ndarr
 
 
 @jit
+
 def upright_angles(rots: jp.ndarray, eps: float = 1e-6) -> jp.ndarray:
     """
-    Compute the angle between each quad's local up-axis (3rd column of R) 
-    and the global z-axis, in radians.
-    
-    Args:
-      rots: Array of shape (num_quads*9,) or (num_quads, 9) representing
-            flattened rotation matrices in row-major order.
-      eps:  Small epsilon to guard against edge‐cases (optional).
-    Returns:
-      angles: Array of shape (num_quads,) with angles in [0, pi].
+    Compute the angle between each quad's local up-axis and global z-axis.
+    Supports rots of shape (...,9) or (...,3,3).
     """
-    # Reshape into (num_quads, 3, 3)
-    R = rots.reshape(-1, 3, 3)
-    # Extract cos(theta) = R[2,2] (dot with [0,0,1])
-    cos_theta = R[:, 2, 2]
-    # Clip for numerical stability
+    # grab R[...,2,2] without any reshape
+    if rots.shape[-1] == 9:
+        cos_theta = rots[..., 8]
+    elif rots.ndim >= 2 and rots.shape[-2:] == (3, 3):
+        cos_theta = rots[..., 2, 2]
+    else:
+        raise ValueError(f"Invalid rots shape {rots.shape}, expected (...,9) or (...,3,3).")
+
+    # clip for numerical stability and return
     cos_theta = jp.clip(cos_theta, -1.0 + eps, 1.0 - eps)
-    # Return angle
     return jp.arccos(cos_theta)
