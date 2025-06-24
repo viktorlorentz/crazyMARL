@@ -58,12 +58,12 @@ def calc_reward(
     taut_reward  = (jp.sum(quad_dists) + jp.sum(quad_heights)) / cfg.cable_length
 
     # angular & linear velocity
-    vel_shaping = 20.0 * er(dis, 20.0)      # scalar
+    vel_shaping = jp.maximum(20.0 * er(dis, 20.0), 0.01 ) # low velocity tolerance close to the target
     ang_norms = jp.linalg.norm(angvels, axis=-1)
     lin_norms = jp.linalg.norm(linvels, axis=-1)
-    safe_linvel = - (0.01 * lin_norms**4) # this makes sure linvel does not grow too large (zero point around 3m/s)
+    safe_linvel = jp.exp(- (0.3 * lin_norms)**4) # no reward for high linear velocities
     ang_vel_reward      = jp.mean(er(ang_norms, vel_shaping))
-    linvel_quad_reward  = jp.mean(er(lin_norms, vel_shaping)-safe_linvel)
+    linvel_quad_reward  = jp.mean(er(lin_norms, vel_shaping) * safe_linvel)
     payload_velocity_reward = er(jp.linalg.norm(payload_linlv), vel_shaping)
 
     # penalties
