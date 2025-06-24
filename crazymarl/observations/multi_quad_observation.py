@@ -106,3 +106,35 @@ def get_ix4_mappings(num_quads: int):
     }
 
     return action_map, dyn_ix
+
+
+def parse_obs(obs: jnp.ndarray, num_quads: int):
+    """
+    Split a flat obs vector into:
+      payload_error (3,),
+      payload_linvel (3,),
+      rel_pos (Q,3),
+      rot matrices (Q,3,3),
+      linvels (Q,3),
+      angvels (Q,3),
+      actions (Q,4)
+    """
+    team_obs = 6
+    quad_obs = 22
+
+    # payload
+    payload_error = obs[0:3]
+    payload_linvel = obs[3:6]
+
+    # per-quad block
+    flat_quads = obs[team_obs:]
+    per_quads = flat_quads.reshape(num_quads, quad_obs)
+
+    rel_pos    = per_quads[:,  0:3]
+    rot_flat   = per_quads[:,  3:12]
+    rots       = rot_flat.reshape(num_quads, 3, 3)
+    linvels    = per_quads[:, 12:15]
+    angvels    = per_quads[:, 15:18]
+    actions    = per_quads[:, 18:22]
+
+    return payload_error, payload_linvel, rel_pos, rots, linvels, angvels, actions

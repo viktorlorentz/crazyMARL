@@ -1,4 +1,7 @@
 import jax.numpy as jp
+from crazymarl.observations.multi_quad_observation import parse_obs
+
+from crazymarl.utils.multi_quad_utils import upright_angles
 
 
 def calc_reward(
@@ -19,20 +22,11 @@ def calc_reward(
     """
     er = lambda x, s=2: jp.exp(-s * jp.abs(x))
 
-    # payload tracking rewards
-    team_obs      = obs[:6]
-    payload_err   = team_obs[:3]
-    payload_linlv = team_obs[3:6]
+    # extract obs components
+    payload_err, payload_linlv, rels, rots, linvels, angvels, prev_last_actions = parse_obs(obs, cfg.num_quads)
     dis = jp.linalg.norm(payload_err)
     tracking_reward = cfg.reward_coeffs["distance_reward_coef"] * er(dis)
 
-    
-    quad_obs = [obs[6 + i*24 : 6 + (i+1)*24] for i in range(cfg.num_quads)]
-    rels     = jp.stack([q[:3]     for q in quad_obs])  # (num_quads,3)
-    rots     = jp.stack([q[3:12]  for q in quad_obs])  # (num_quads,9)
-    linvels  = jp.stack([q[12:15] for q in quad_obs])  # (num_quads,3)
-    angvels  = jp.stack([q[15:18] for q in quad_obs])  # (num_quads,3)
-    
 
     # safe-distance reward (mean over all pairs)
     if cfg.num_quads > 1:
@@ -44,6 +38,8 @@ def calc_reward(
     else:
         safe_distance = 1.0
 
+    # from rots get the up vector and compute the upright reward
+    angles = upright_angles(rots)
     # upright reward = mean over all quads
     up_reward = jp.mean(er(angles))
 
@@ -68,13 +64,17 @@ def calc_reward(
     # if actions out of bounds lead them to action space
     thrust_extremes = jp.where(jp.abs(action)> 1.0, 1.0 + 0.1*jp.abs(action), thrust_extremes)  
 
+    payload_linvel_reward =  er(jp.linalg.norm(payload_linlv)) 
+
     energy_penalty    = cfg.reward_coeffs["action_energy_coef"] * jp.mean(thrust_extremes)
 
 
     stability = (cfg.reward_coeffs["up_reward_coef"] * up_reward
                  + cfg.reward_coeffs["taut_reward_coef"] * taut_reward
                  + cfg.reward_coeffs["ang_vel_reward_coef"] * ang_vel_reward
-                 + cfg.reward_coeffs["linvel_quad_reward_coef"] * linvel_quad_reward)
+                 + cfg.reward_coeffs["linvel_quad_reward_coef"] * linvel_quad_reward
+                 + cfg.reward_coeffs["linvel_reward_coef"] * payload_linvel_reward)
+    
     safety = safe_distance * cfg.reward_coeffs["safe_distance_coef"] \
            + collision_penalty + oob_penalty + smooth_penalty + energy_penalty
 
