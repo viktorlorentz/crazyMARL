@@ -34,12 +34,13 @@ class ActorModule(nn.Module):
 
     @nn.compact
     def __call__(self, x):
-        act_fn = nn.relu if self.activation == "relu" else nn.tanh
+        act_fn = nn.relu #if self.activation == "relu" else nn.tanh
         a = x
         for h in self.actor_arch or [128, 64, 64]:
             a = nn.Dense(h, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(a)
             a = act_fn(a)
         actor_mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(a)
+        actor_mean = nn.tanh(actor_mean)  # Ensure actions are in [-1, 1] range
         return actor_mean
 
 class CriticModule(nn.Module):
