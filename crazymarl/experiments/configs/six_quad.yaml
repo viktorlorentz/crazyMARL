@@ -4,5 +4,5 @@ training:
     num_quads: 6
     cable_length: 0.45
     payload_mass: 0.04
-  TOTAL_TIMESTEPS: 2000000000
+  TOTAL_TIMESTEPS: 3000000000
   
