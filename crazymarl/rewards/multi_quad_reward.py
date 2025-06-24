@@ -63,10 +63,10 @@ def calc_reward(
     vel_shaping = jp.maximum(4.0 * er(dis, 50.0), 0.01 ) # low velocity tolerance close to the target
     ang_norms = jp.linalg.norm(angvels, axis=-1)
     lin_norms = jp.linalg.norm(linvels, axis=-1)
-    safe_linvel = jp.exp(- (0.5 * lin_norms)**4) # no reward for high linear velocities
+    safe_linvel = jp.exp(- (0.7 * lin_norms)**4) # no reward for high linear velocities
     ang_vel_reward      = jp.mean(er(ang_norms))
     linvel_quad_reward  = jp.mean(er(lin_norms, vel_shaping) * safe_linvel)
-    payload_velocity_reward = er(jp.linalg.norm(payload_linlv), vel_shaping)
+    payload_velocity_reward = er(jp.linalg.norm(payload_linlv), vel_shaping) * safe_linvel
 
     # penalties
     collision_penalty = cfg.reward_coeffs["collision_penalty_coef"] * collision
@@ -85,8 +85,7 @@ def calc_reward(
                  + cfg.reward_coeffs["taut_reward_coef"] * taut_reward
                  + cfg.reward_coeffs["ang_vel_reward_coef"] * ang_vel_reward
                  + cfg.reward_coeffs["linvel_quad_reward_coef"] * linvel_quad_reward
-                 + cfg.reward_coeffs["linvel_reward_coef"] * payload_velocity_reward
-                 + aligned_vel)
+                 + cfg.reward_coeffs["linvel_reward_coef"] * payload_velocity_reward)
     
     safety = safe_distance * cfg.reward_coeffs["safe_distance_coef"] \
            + collision_penalty + oob_penalty + smooth_penalty + energy_penalty
