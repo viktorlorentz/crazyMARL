@@ -22,6 +22,7 @@ training:
     cable_length: 0.4
     payload_mass: 0.01
     policy_freq: 250
+    target_start_ratio: 0.2
   TOTAL_TIMESTEPS: 1000000
   NUM_ENVS: 16384
   NUM_STEPS: 32
