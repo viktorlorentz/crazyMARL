@@ -35,14 +35,16 @@ def calc_reward(
   
 
     aligned_vel = er(1 - jp.dot(vel_dir, target_dir), dis) # dotprod = 1  => vel is perfectly aligned
-    tracking_reward += aligned_vel
+   
 
     # safe-distance reward (mean over all pairs)
     if cfg.num_quads > 1:
         d = jp.linalg.norm(rels[:, None, :] - rels[None, :, :], axis=-1)
         eye = jp.eye(cfg.num_quads, dtype=bool)
         pairwise = jp.where(eye, jp.inf, d)
-        safe_distance = jp.mean(jp.clip(3*(pairwise - 0.18) / 0.02, -20, 1))
+        # make sure the distance is positive
+        pair_distance = jp.abs(pairwise) - 0.15
+        safe_distance = jp.mean(jp.clip(20 * pair_distance, 0, 1)) # encourage more than dist of 0.15m between quads and full reward for distances above 0.2m
 
     else:
         safe_distance = 1.0
@@ -55,13 +57,13 @@ def calc_reward(
     # taut-string reward = sum of distances + heights
     quad_dists   = jp.linalg.norm(rels, axis=-1)
     quad_heights = rels[:, 2]
-    taut_reward  = (jp.sum(quad_dists) + jp.sum(quad_heights)) / cfg.cable_length
+    taut_reward  = (jp.mean(quad_dists) + jp.mean(quad_heights)) / cfg.cable_length
 
     # angular & linear velocity
     vel_shaping = jp.maximum(20.0 * er(dis, 20.0), 0.01 ) # low velocity tolerance close to the target
     ang_norms = jp.linalg.norm(angvels, axis=-1)
     lin_norms = jp.linalg.norm(linvels, axis=-1)
-    safe_linvel = jp.exp(- (0.3 * lin_norms)**4) # no reward for high linear velocities
+    safe_linvel = jp.exp(- (0.4 * lin_norms)**4) # no reward for high linear velocities
     ang_vel_reward      = jp.mean(er(ang_norms, vel_shaping))
     linvel_quad_reward  = jp.mean(er(lin_norms, vel_shaping) * safe_linvel)
     payload_velocity_reward = er(jp.linalg.norm(payload_linlv), vel_shaping)
@@ -70,7 +72,7 @@ def calc_reward(
     collision_penalty = cfg.reward_coeffs["collision_penalty_coef"] * collision
     oob_penalty       = cfg.reward_coeffs["out_of_bounds_penalty_coef"] * out_of_bounds
 
-    smooth_penalty    = cfg.reward_coeffs["smooth_action_coef"] * jp.mean(jp.abs(action - last_action))**2
+    smooth_penalty    = cfg.reward_coeffs["smooth_action_coef"] * jp.mean(jp.abs(action - last_action)**2)
     thrust_cmds = 0.5 * (action + 1.0)
     thrust_extremes = jp.exp(-50 * jp.abs(thrust_cmds)) + jp.exp(50 * (thrust_cmds - 1)) # 1 if thrust_cmds is 0 or 1 and going to 0 in the middle
     # if actions out of bounds lead them to action space
@@ -83,7 +85,8 @@ def calc_reward(
                  + cfg.reward_coeffs["taut_reward_coef"] * taut_reward
                  + cfg.reward_coeffs["ang_vel_reward_coef"] * ang_vel_reward
                  + cfg.reward_coeffs["linvel_quad_reward_coef"] * linvel_quad_reward
-                 + cfg.reward_coeffs["linvel_reward_coef"] * payload_velocity_reward)
+                 + cfg.reward_coeffs["linvel_reward_coef"] * payload_velocity_reward
+                 + aligned_vel)
     
     safety = safe_distance * cfg.reward_coeffs["safe_distance_coef"] \
            + collision_penalty + oob_penalty + smooth_penalty + energy_penalty
