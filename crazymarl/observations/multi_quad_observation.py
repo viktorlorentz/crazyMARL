@@ -20,6 +20,7 @@ def build_obs(
     err = target_position - payload_pos                              # (3,)
     dist = jnp.linalg.norm(err)
     payload_error = err / jnp.maximum(dist, 1.0)                      # (3,)
+    # this make sure the payload error is capped to a unit vector
 
     # --- per-quad quantities (vectorized) ---
     quad_ids = jnp.array(ids["quad_body_ids"], dtype=int)             # (Q,)
