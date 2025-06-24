@@ -76,11 +76,14 @@ def generate_filtered_configuration_batch(
     min_quad = jp.min(dists, axis=(1, 2))
 
     # quad-payload distances
-    pd = quadss - payloads[:, None, :]
-    min_payload = jp.min(jp.linalg.norm(pd, axis=-1), axis=1)
+    # pd = quadss - payloads[:, None, :]
+    # min_payload = jp.min(jp.linalg.norm(pd, axis=-1), axis=1)
 
     # mask and select
-    mask = (min_quad >= 0.19) & (min_payload >= 0.03)
-    idx = jp.argsort(-mask.astype(jp.int32))[:batch_size]
+    # mask = (min_quad >= 0.19) & (min_payload >= 0.03)
+    # idx = jp.argsort(-mask.astype(jp.int32))[:batch_size]
+
+    # take the batch with the largest min_quad distance
+    idx = jp.argsort(-min_quad)[:batch_size]
 
     return payloads[idx], quadss[idx]
