@@ -94,6 +94,8 @@ def calc_reward(
     
     safety = safe_distance * cfg.reward_coeffs["safe_distance_coef"] \
            + collision_penalty + oob_penalty + smooth_penalty + energy_penalty
+    
+    safety /= 5.0
 
     reward = tracking_reward * stability + safety
   
