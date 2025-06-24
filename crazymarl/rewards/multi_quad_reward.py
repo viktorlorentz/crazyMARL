@@ -77,9 +77,6 @@ def calc_reward(
     oob_penalty       = cfg.reward_coeffs["out_of_bounds_penalty_coef"] * out_of_bounds
 
     smooth_penalty    = cfg.reward_coeffs["smooth_action_coef"] * jp.mean(jp.abs(action - last_action)**2)
-    action_diff = jp.abs(action - last_action)
-    smooth_action_reward = jp.mean(er(action_diff, 20))  
-
     thrust_cmds = 0.5 * (action + 1.0)
     thrust_extremes = jp.exp(-50 * jp.abs(thrust_cmds)) + jp.exp(50 * (thrust_cmds - 1)) # 1 if thrust_cmds is 0 or 1 and going to 0 in the middle
     # if actions out of bounds lead them to action space
@@ -92,15 +89,13 @@ def calc_reward(
                  + cfg.reward_coeffs["taut_reward_coef"] * taut_reward
                  + cfg.reward_coeffs["ang_vel_reward_coef"] * ang_vel_reward
                  + cfg.reward_coeffs["linvel_quad_reward_coef"] * linvel_quad_reward
-                 + cfg.reward_coeffs["linvel_reward_coef"] * payload_velocity_reward
-                 + smooth_action_reward
-                 )
-    stability /= 6.0  # normalize stability to be in [0, 1]
+                 + cfg.reward_coeffs["linvel_reward_coef"] * payload_velocity_reward)
+    stability /= 5.0  # normalize stability to be in [0, 1]
     
     safety = safe_distance * cfg.reward_coeffs["safe_distance_coef"] \
-           + collision_penalty + oob_penalty  + energy_penalty
+           + collision_penalty + oob_penalty + smooth_penalty + energy_penalty
     
-    safety /= 4.0
+    safety /= 5.0
 
     reward = tracking_reward * stability + safety
   

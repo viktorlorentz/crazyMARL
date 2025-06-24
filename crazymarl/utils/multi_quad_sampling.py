@@ -68,20 +68,19 @@ def generate_filtered_configuration_batch(
         in_axes=(0, None, None, None, None)
     )(keys, num_quads, cable_length, target_position, target_start_ratio)
 
-    # quad-quad distances only in x-y plane
-    quads_xy = quadss[..., :2]
-    diffs_xy = quads_xy[:, :, None, :] - quads_xy[:, None, :, :]
-    dists_xy = jp.linalg.norm(diffs_xy, axis=-1)
+    # quad-quad distances
+    diffs = quadss[:, :, None, :] - quadss[:, None, :, :]
+    dists = jp.linalg.norm(diffs, axis=-1)
     eye = jp.eye(num_quads, dtype=bool)[None]
-    dists_xy = jp.where(eye, jp.inf, dists_xy)
-    min_quad = jp.min(dists_xy, axis=(1, 2))
+    dists = jp.where(eye, jp.inf, dists)
+    min_quad = jp.min(dists, axis=(1, 2))
 
     # quad-payload distances
     pd = quadss - payloads[:, None, :]
     min_payload = jp.min(jp.linalg.norm(pd, axis=-1), axis=1)
 
     # mask and select
-    mask = (min_quad >= 0.16) & (min_payload >= 0.07)
+    mask = (min_quad >= 0.19) & (min_payload >= 0.03)
     idx = jp.argsort(-mask.astype(jp.int32))[:batch_size]
 
     return payloads[idx], quadss[idx]
