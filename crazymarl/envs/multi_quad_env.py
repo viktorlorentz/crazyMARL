@@ -125,12 +125,14 @@ class MultiQuadEnv(PipelineEnv):
             noise = jax.random.normal(noise_key, shape=action_scaled.shape)
             action_scaled = action_scaled + cfg.act_noise * max_thrust * noise
 
+        quad_body_ids = jp.array(self.ids["quad_body_ids"])
+
         up = jp.array([0.0, 0.0, 1.0])
         # collect orientations & positions
-        quats = ps.xquat[self.ids["quad_body_ids"]]  # (num_quads, 4)
+        quats = ps.xquat[quad_body_ids]  # (num_quads, 4)
         angles = upright_angles(R_from_quat(quats))  # (num_quads,)
 
-        qp = ps.xpos[self.ids["quad_body_ids"]] # (num_quads, 3)
+        qp = ps.xpos[quad_body_ids] # (num_quads, 3)
 
         # pairwise quad-quad collision TODO: make this use proper mjx collision detection
         dists = jp.linalg.norm(qp[:, None, :] - qp[None, :, :], axis=-1)
