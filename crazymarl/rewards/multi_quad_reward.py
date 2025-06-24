@@ -35,7 +35,7 @@ def calc_reward(
   
 
     aligned_vel = er(1 - jp.dot(vel_dir, target_dir), dis) # dotprod = 1  => vel is perfectly aligned
-   
+    tracking_reward += aligned_vel
 
     # safe-distance reward (mean over all pairs)
     if cfg.num_quads > 1:
@@ -63,10 +63,12 @@ def calc_reward(
     vel_shaping = jp.maximum(4.0 * er(dis, 50.0), 0.01 ) # low velocity tolerance close to the target
     ang_norms = jp.linalg.norm(angvels, axis=-1)
     lin_norms = jp.linalg.norm(linvels, axis=-1)
-    safe_linvel = jp.exp(- (0.7 * lin_norms)**4) # no reward for high linear velocities
+    safe_linvel = jp.exp(- (0.5 * lin_norms)**4) # no reward for high linear velocities
     ang_vel_reward      = jp.mean(er(ang_norms))
     linvel_quad_reward  = jp.mean(er(lin_norms, vel_shaping) * safe_linvel)
-    payload_velocity_reward = er(jp.linalg.norm(payload_linlv), vel_shaping) * safe_linvel
+    payload_linlv_norm = jp.linalg.norm(payload_linlv)
+    safe_quad_linvel = jp.exp(- (0.7 * payload_linlv_norm)**4) # no reward for high linear velocities
+    payload_velocity_reward = er(payload_linlv_norm, vel_shaping) * safe_quad_linvel
 
     # penalties
     collision_penalty = cfg.reward_coeffs["collision_penalty_coef"] * collision
