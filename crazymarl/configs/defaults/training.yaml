@@ -13,18 +13,18 @@ training:
       collision_penalty_coef: -10.0
       out_of_bounds_penalty_coef: -10.0
       smooth_action_coef: -5.0
-      action_energy_coef: -1.0
+      action_energy_coef: -0.5
     obs_noise: 0.0
     act_noise: 0.0
-    max_thrust_range: 0.15
-    num_quads: 2
+    max_thrust_range: 0.0
+    num_quads: 1
     episode_length: 2048
-    cable_length: 0.3
+    cable_length: 0.4
     payload_mass: 0.01
     policy_freq: 250
   TOTAL_TIMESTEPS: 1000000
   NUM_ENVS: 16384
-  NUM_STEPS: 64
+  NUM_STEPS: 32
   NUM_MINIBATCHES: 128
   UPDATE_EPOCHS: 8
   ANNEAL_LR: false
