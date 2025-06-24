@@ -44,7 +44,7 @@ def calc_reward(
         pairwise = jp.where(eye, jp.inf, d)
         # make sure the distance is positive
         pair_distance = jp.abs(pairwise) - 0.15
-        safe_distance = jp.mean(jp.clip(20 * pair_distance, 0, 1)) # encourage more than dist of 0.15m between quads and full reward for distances above 0.2m
+        safe_distance = jp.mean(jp.clip(40 * pair_distance, 0, 1)) # encourage more than dist of 0.15m between quads and full reward for distances above 0.175m
 
     else:
         safe_distance = 1.0
@@ -57,7 +57,7 @@ def calc_reward(
     # taut-string reward = sum of distances + heights
     quad_dists   = jp.linalg.norm(rels, axis=-1)
     quad_heights = rels[:, 2]
-    taut_reward  = (jp.mean(quad_dists) + jp.mean(quad_heights)) / cfg.cable_length
+    taut_reward  = (jp.mean(quad_dists) + 5 * jp.mean(quad_heights)) / cfg.cable_length
 
     # angular & linear velocity
     vel_shaping = jp.maximum(4.0 * er(dis, 50.0), 0.01 ) # low velocity tolerance close to the target
@@ -74,7 +74,7 @@ def calc_reward(
 
     smooth_penalty    = cfg.reward_coeffs["smooth_action_coef"] * jp.mean(jp.abs(action - last_action)**2)
     thrust_cmds = 0.5 * (action + 1.0)
-    thrust_extremes = jp.exp(-50 * jp.abs(thrust_cmds)) + jp.exp(10 * (thrust_cmds - 1)) # 1 if thrust_cmds is 0 or 1 and going to 0 in the middle
+    thrust_extremes = jp.exp(-50 * jp.abs(thrust_cmds)) + jp.exp(50 * (thrust_cmds - 1)) # 1 if thrust_cmds is 0 or 1 and going to 0 in the middle
     # if actions out of bounds lead them to action space
     thrust_extremes = jp.where(jp.abs(action)> 1.0, 1.0 + 0.1*jp.abs(action), thrust_extremes)  
 
