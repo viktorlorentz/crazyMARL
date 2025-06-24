@@ -12,7 +12,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..
 sys.path.insert(0, project_root)
 
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-# os.environ["MUJOCO_GL"] = "egl"
+os.environ["MUJOCO_GL"] = "egl"
 # Create a cache directory relative to the current working directory
 cache_dir = os.path.join(os.getcwd(), "xla_cache")
 os.makedirs(cache_dir, exist_ok=True)
@@ -40,7 +40,6 @@ from baselines.IPPO.ippo_ff_mabrax import make_train, ActorCritic,CriticModule, 
 import onnx
 from jax2onnx import to_onnx, onnx_function
 
-import jax.numpy as jnp
 import tensorflow as tf
 import numpy as np
 
@@ -164,7 +163,7 @@ def main(config_file=None):
     act_dim = env.action_spaces[env.agents[0]].shape[0]
 
     # create a dummy input for initializing modules
-    dummy_obs = jnp.zeros((1, obs_shape))
+    dummy_obs = jp.zeros((1, obs_shape))
 
     # Initialize actor
     actor = ActorModule(

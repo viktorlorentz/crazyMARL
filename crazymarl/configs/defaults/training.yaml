@@ -16,7 +16,7 @@ training:
       action_energy_coef: -1.0
     obs_noise: 0.0
     act_noise: 0.0
-    max_thrust_range: 0.0
+    max_thrust_range: 0.2
     num_quads: 2
     episode_length: 2048
     cable_length: 0.4
@@ -24,7 +24,7 @@ training:
     policy_freq: 250
   TOTAL_TIMESTEPS: 1000000
   NUM_ENVS: 16384
-  NUM_STEPS: 32
+  NUM_STEPS: 64
   NUM_MINIBATCHES: 128
   UPDATE_EPOCHS: 8
   ANNEAL_LR: false
