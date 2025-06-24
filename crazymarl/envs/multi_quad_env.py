@@ -121,32 +121,32 @@ class MultiQuadEnv(PipelineEnv):
         noise_key = jax.random.fold_in(noise_key, jp.int32(jp.sum(ps.cvel) * 1e3))
 
         # Add actuator noise.
-        if self.act_noise:
+        if cfg.act_noise:
             noise = jax.random.normal(noise_key, shape=action_scaled.shape)
-            action_scaled = action_scaled + self.act_noise * max_thrust * noise
+            action_scaled = action_scaled + cfg.act_noise * max_thrust * noise
 
         up = jp.array([0.0, 0.0, 1.0])
         # collect orientations & positions
         quats = ps.xquat[self.ids["quad_body_ids"]]  # (num_quads, 4)
         angles = upright_angles(R_from_quat(quats))  # (num_quads,)
 
-        qp = ps.xpos[self.quad_body_ids] # (num_quads, 3)
+        qp = ps.xpos[self.ids["quad_body_ids"]] # (num_quads, 3)
 
         # pairwise quad-quad collision TODO: make this use proper mjx collision detection
         dists = jp.linalg.norm(qp[:, None, :] - qp[None, :, :], axis=-1)
-        eye  = jp.eye(self.num_quads, dtype=bool)
+        eye  = jp.eye(cfg.num_quads, dtype=bool)
         min_dist = jp.min(jp.where(eye, jp.inf, dists))
         quad_collision = min_dist < 0.15
 
         # ground collision if any quads AND payload near ground
         ground_collision_quad    = jp.any(qp[:, 2] < 0.03)
-        ground_collision_payload = ps.xpos[self.payload_body_id][2] < 0.03
+        ground_collision_payload = ps.xpos[self.ids["payload_body_id"]][2] < 0.03
         ground_collision = jp.logical_or(ground_collision_quad, ground_collision_payload)
         collision       = jp.logical_or(quad_collision, ground_collision)
 
         # out-of-bounds if any quad tilts too far or goes under payload
         too_tilted = jp.any(jp.abs(angles) > jp.radians(150))
-        below_pl   = jp.any(qp[:, 2] < ps.xpos[self.payload_body_id][2] - 0.15)
+        below_pl   = jp.any(qp[:, 2] < ps.xpos[self.ids["payload_body_id"]][2] - 0.15)
         out_of_bounds = jp.logical_or(too_tilted, below_pl)
 
         # out of bounds for pos error shrinking with time
@@ -170,12 +170,6 @@ class MultiQuadEnv(PipelineEnv):
             target_position = self.trajectory[target_idx]
 
 
-        obs = self._get_obs(ps, action, target_position, noise_key)
-        reward, _, _ = calc_reward(
-            obs, ps.time, collision, out_of_bounds,
-            action, angles, prev_last_action,
-            target_position, ps, max_thrust
-        )
 
         obs = build_obs(ps, action, target_position, cfg.obs_noise, noise_key, self.ids)
         reward = calc_reward(obs, ps.time, collision, out_of_bounds, action, angles, prev_last_action, target_position, ps, max_thrust, cfg)
@@ -185,7 +179,7 @@ class MultiQuadEnv(PipelineEnv):
         ground_collision,
         jp.logical_or(
             ps.time > 3, # allow 2 seconds for takeoff
-            ps.cvel[self.payload_body_id][2] < -3.0,
+            ps.cvel[self.ids["payload_body_id"]][2] < -3.0,
         )
         )
 
