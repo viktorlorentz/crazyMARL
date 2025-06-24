@@ -8,7 +8,7 @@ from crazymarl.builders.quad_env_builder import make_brax_system, get_body_and_j
 from crazymarl.utils.multi_quad_sampling import generate_filtered_configuration_batch
 from crazymarl.observations.multi_quad_observation import build_obs
 from crazymarl.rewards.multi_quad_reward import calc_reward
-from crazymarl.utils.multi_quad_utils import R_from_quat, angle_between
+from crazymarl.utils.multi_quad_utils import R_from_quat, upright_angles
 
 class MultiQuadEnv(PipelineEnv):
     def __init__(self, **kwargs):
@@ -100,46 +100,106 @@ class MultiQuadEnv(PipelineEnv):
         obs = build_obs(ps, last_act, self.target_position, cfg.obs_noise, nk, self.ids)
         return State(ps, obs, jp.array(0.0), jp.array(0.0), {'time': ps.time, 'reward': 0.0, 'max_thrust': max_thrust})
 
-    def step(self, state: State, action: jp.ndarray) -> State:
+    def step(self, state: State, action: jax.Array) -> State:
         cfg = self.cfg
-        prev_act = state.obs[-self.sys.nu:]
+   
+        # Extract previous action from the observation.
+        prev_last_action = state.obs[-self.sys.nu:]
+        # Scale actions from [-1, 1] to thrust commands in [0, max_thrust].
         max_thrust = state.metrics['max_thrust']
-        cmds = jp.clip(0.5*(action+1.0),0.0,1.0) * max_thrust
-        ps = self.pipeline_step(state.pipeline_state, cmds)
+        thrust_cmds = 0.5 * (action + 1.0)
+        thrust_cmds = jp.clip(thrust_cmds, 0.0, 1.0)
+        action_scaled = thrust_cmds * max_thrust
 
-        nk = jax.random.PRNGKey(0)
-        nk = jax.random.fold_in(nk, jp.int32(ps.time*1e6))
-        nk = jax.random.fold_in(nk, jp.int32(jp.sum(ps.xpos)*1e3))
-        nk = jax.random.fold_in(nk, jp.int32(jp.sum(ps.cvel)*1e3))
-        if cfg.act_noise:
-            noise = jax.random.normal(nk, action.shape)
-            cmds = cmds + cfg.act_noise * max_thrust * noise
+ 
+        ps = self.pipeline_step(state.pipeline_state, action_scaled)
 
-        angles=[]; qp=[]
-        up = jp.array([0.0,0.0,1.0])
-        for b in self.ids["quad_body_ids"]:
-            quat = ps.xquat[b]
-            angles.append(angle_between(R_from_quat(quat)[:,2], up))
-            qp.append(ps.xpos[b])
-        angles = jp.stack(angles); qp = jp.stack(qp)
+        # Generate a dynamic noise_key using pipeline_state fields.
+        noise_key = jax.random.PRNGKey(0)
+        noise_key = jax.random.fold_in(noise_key, jp.int32(ps.time * 1e6))
+        noise_key = jax.random.fold_in(noise_key, jp.int32(jp.sum(ps.xpos) * 1e3))
+        noise_key = jax.random.fold_in(noise_key, jp.int32(jp.sum(ps.cvel) * 1e3))
 
-        d = qp[:,None,:] - qp[None,:,:]
-        min_d = jp.min(jp.where(jp.eye(cfg.num_quads, dtype=bool), jp.inf, jp.linalg.norm(d, axis=-1)))
-        quad_col = min_d < 0.15
-        ground_col = jp.any(qp[:,2]<0.03) | (ps.xpos[self.ids["payload_body_id"]][2]<0.03)
+        # Add actuator noise.
+        if self.act_noise:
+            noise = jax.random.normal(noise_key, shape=action_scaled.shape)
+            action_scaled = action_scaled + self.act_noise * max_thrust * noise
 
-        too_tilt = jp.any(jp.abs(angles)>jp.radians(150))
-        below_pl = jp.any(qp[:,2] < ps.xpos[self.ids["payload_body_id"]][2]-0.15)
-        oob = too_tilt | below_pl
+        up = jp.array([0.0, 0.0, 1.0])
+        # collect orientations & positions
+        quats = ps.xquat[self.ids["quad_body_ids"]]  # (num_quads, 4)
+        angles = upright_angles(R_from_quat(quats))  # (num_quads,)
 
-        tgt = self.target_position
-        if self.trajectory is not None:
-            idx = jp.clip(jp.floor(ps.time/self.time_per_action).astype(jp.int32), 0, self.trajectory.shape[0]-1)
-            tgt = self.trajectory[idx]
+        qp = ps.xpos[self.quad_body_ids] # (num_quads, 3)
 
-        obs = build_obs(ps, action, tgt, cfg.obs_noise, nk, self.ids)
-        coll = quad_col | ground_col
-        reward = calc_reward(obs, ps.time, coll, oob, action, angles, prev_act, tgt, ps, max_thrust, cfg)
-        done = (oob | coll).astype(jp.float32)
-        metrics = {'time': ps.time, 'reward': reward, 'max_thrust': max_thrust}
+        # pairwise quad-quad collision TODO: make this use proper mjx collision detection
+        dists = jp.linalg.norm(qp[:, None, :] - qp[None, :, :], axis=-1)
+        eye  = jp.eye(self.num_quads, dtype=bool)
+        min_dist = jp.min(jp.where(eye, jp.inf, dists))
+        quad_collision = min_dist < 0.15
+
+        # ground collision if any quads AND payload near ground
+        ground_collision_quad    = jp.any(qp[:, 2] < 0.03)
+        ground_collision_payload = ps.xpos[self.payload_body_id][2] < 0.03
+        ground_collision = jp.logical_or(ground_collision_quad, ground_collision_payload)
+        collision       = jp.logical_or(quad_collision, ground_collision)
+
+        # out-of-bounds if any quad tilts too far or goes under payload
+        too_tilted = jp.any(jp.abs(angles) > jp.radians(150))
+        below_pl   = jp.any(qp[:, 2] < ps.xpos[self.payload_body_id][2] - 0.15)
+        out_of_bounds = jp.logical_or(too_tilted, below_pl)
+
+        # out of bounds for pos error shrinking with time
+        # payload_pos = ps.xpos[self.payload_body_id]
+        # payload_error = self.target_position - payload_pos
+        # payload_error_norm = jp.linalg.norm(payload_error)
+        # max_time_to_target = self.max_time * 0.75
+        # time_progress = jp.clip(ps.time / max_time_to_target, 0.0, 1.0)
+        # max_payload_error = 4 * (1 - time_progress) + 0.05 # allow for 5cm error at the target
+        # out_of_bounds = jp.logical_or(out_of_bounds, payload_error_norm > max_payload_error)
+
+
+        # set target if trajectory is provided
+        target_position = self.target_position
+        if self.trajectory is not None and self.trajectory.shape[0] > 0:
+            # get the next target position from the trajectory
+            target_idx = jp.clip(
+                jp.floor(ps.time  / self.time_per_action).astype(jp.int32),
+                0, self.trajectory.shape[0] - 1
+            ) 
+            target_position = self.trajectory[target_idx]
+
+
+        obs = self._get_obs(ps, action, target_position, noise_key)
+        reward, _, _ = calc_reward(
+            obs, ps.time, collision, out_of_bounds,
+            action, angles, prev_last_action,
+            target_position, ps, max_thrust
+        )
+
+        obs = build_obs(ps, action, target_position, cfg.obs_noise, noise_key, self.ids)
+        reward = calc_reward(obs, ps.time, collision, out_of_bounds, action, angles, prev_last_action, target_position, ps, max_thrust, cfg)
+
+        # dont terminate ground collision on ground start
+        ground_collision = jp.logical_and(
+        ground_collision,
+        jp.logical_or(
+            ps.time > 3, # allow 2 seconds for takeoff
+            ps.cvel[self.payload_body_id][2] < -3.0,
+        )
+        )
+
+        collision = jp.logical_or(quad_collision, ground_collision)
+        
+        done = jp.logical_or(out_of_bounds, collision)
+    
+        
+        done = done * 1.0
+
+        metrics = {
+        'time': ps.time,
+        'reward': reward,
+        'max_thrust': state.metrics['max_thrust']
+        }
         return state.replace(pipeline_state=ps, obs=obs, reward=reward, done=done, metrics=metrics)
+
