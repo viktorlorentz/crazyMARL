@@ -37,6 +37,8 @@ def calc_reward(
     aligned_vel = er(1 - jp.dot(vel_dir, target_dir), dis) # dotprod = 1  => vel is perfectly aligned
     tracking_reward += aligned_vel
 
+    tracking_reward /=2 # normalize tracking reward to be in [0, 1]
+
     # safe-distance reward (mean over all pairs)
     if cfg.num_quads > 1:
         d = jp.linalg.norm(rels[:, None, :] - rels[None, :, :], axis=-1)
@@ -88,10 +90,11 @@ def calc_reward(
                  + cfg.reward_coeffs["ang_vel_reward_coef"] * ang_vel_reward
                  + cfg.reward_coeffs["linvel_quad_reward_coef"] * linvel_quad_reward
                  + cfg.reward_coeffs["linvel_reward_coef"] * payload_velocity_reward)
+    stability /= 5.0  # normalize stability to be in [0, 1]
     
     safety = safe_distance * cfg.reward_coeffs["safe_distance_coef"] \
            + collision_penalty + oob_penalty + smooth_penalty + energy_penalty
 
-    reward = tracking_reward * (stability + safety)
+    reward = tracking_reward * stability + safety
   
     return reward
