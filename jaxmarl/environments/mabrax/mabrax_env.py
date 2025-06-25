@@ -3,13 +3,15 @@ import chex
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jaxmarl.environments import spaces
 from brax import envs
-import jaxmarl.environments.mabrax.multi_quad_env  
-import jaxmarl.environments.mabrax.quad_env
+# import jaxmarl.environments.mabrax.multi_quad_env  
+# import jaxmarl.environments.mabrax.quad_env
 import jax
 import jax.numpy as jnp
 from functools import partial
 
-from .mappings import _agent_action_mapping, _agent_observation_mapping, get_ix4_mappings
+from .mappings import _agent_action_mapping, _agent_observation_mapping
+
+from crazymarl.observations.multi_quad_observation import get_ix4_mappings
 
 # TODO: move homogenisation to a separate wrapper
 
@@ -231,34 +233,6 @@ class MABraxEnv(MultiAgentEnv):
         return self.env.dt
 
 
-class Ant(MABraxEnv):
-    def __init__(self, **kwargs):
-        super().__init__("ant_4x2", **kwargs)
-
-
-class HalfCheetah(MABraxEnv):
-    def __init__(self, **kwargs):
-        super().__init__("halfcheetah_6x1", **kwargs)
-
-
-class Hopper(MABraxEnv):
-    def __init__(self, **kwargs):
-        super().__init__("hopper_3x1", **kwargs)
-
-
-class Humanoid(MABraxEnv):
-    def __init__(self, **kwargs):
-        super().__init__("humanoid_9|8", **kwargs)
-
-
-class Walker2d(MABraxEnv):
-    def __init__(self, **kwargs):
-        super().__init__("walker2d_2x3", **kwargs)
-
 class MultiQuad(MABraxEnv):
     def __init__(self,  **kwargs):
         super().__init__("multiquad_ix4", **kwargs)
-
-class Quad(MABraxEnv):
-    def __init__(self, **kwargs):
-        super().__init__("quad_1x4", **kwargs)

@@ -6,8 +6,13 @@ renders the rollout (rendering every few frames), and saves the result as a vide
 """
 
 import os
+import sys
+# add project root so that `import baselines...` works
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, project_root)
+
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-#os.environ["MUJOCO_GL"] = "egl"
+os.environ["MUJOCO_GL"] = "egl"
 # Create a cache directory relative to the current working directory
 cache_dir = os.path.join(os.getcwd(), "xla_cache")
 os.makedirs(cache_dir, exist_ok=True)
@@ -28,13 +33,13 @@ from brax import envs
 import jaxmarl
 import time
 import wandb
+import yaml
 # Import training utilities and network definitions from ippo_ff_mabrax.py
 from baselines.IPPO.ippo_ff_mabrax import make_train, ActorCritic,CriticModule, ActorModule, batchify, unbatchify
 
 import onnx
 from jax2onnx import to_onnx, onnx_function
 
-import jax.numpy as jnp
 import tensorflow as tf
 import numpy as np
 
@@ -100,63 +105,29 @@ def eval_results(eval_env, jit_reset, jit_inference_fn, jit_step):
     plt.close()
 
 
-def main():
-    # Default reward coefficients
-    default_reward_coeffs = {
-        "distance_reward_coef": 1.0,
-        "z_distance_reward_coef": 0.0,
-        "velocity_reward_coef": 1.0,
-        "safe_distance_coef": 1.0,
-        "up_reward_coef": 1.0,
-        "linvel_reward_coef": 1.0,
-        "ang_vel_reward_coef": 1.0,
-        "linvel_quad_reward_coef": 1.0,
-        "taut_reward_coef": 1.0,
-        "collision_penalty_coef": -10.0,
-        "out_of_bounds_penalty_coef": -10.0,
-        "smooth_action_coef": -10.0,
-        "action_energy_coef": -1.0,
-    }
-    # Build configuration for IPPO training on multiquad_2x4
-    config = {
-        "ENV_NAME": "multiquad_ix4",
-        "ENV_KWARGS": {
-            "reward_coeffs": default_reward_coeffs,
-            "obs_noise": 0.0,
-            "act_noise": 0.0,
-            "max_thrust_range": 0.15,
-            "num_quads": 2,
-            "episode_length": 2048,
-            "cable_length": 0.3,
-            "payload_mass": 0.01,
-            "policy_freq": 500,
-        },
-        "TOTAL_TIMESTEPS": 1_000_000, 
-        "NUM_ENVS": 16384, # 16384
-        "NUM_STEPS": 32,
-        "NUM_MINIBATCHES": 128, # Batch size is NUM_ENVS * NUM_STEPS / NUM_MINIBATCHES = 16384 * 128 / 4096 = 512
-        # "TOTAL_TIMESTEPS": 1_000_000_000,
-        # "NUM_ENVS": 2048, # 16384,
-        # "NUM_STEPS": 256,
-        # "NUM_MINIBATCHES": 512,
-        "UPDATE_EPOCHS": 8,
-        "ANNEAL_LR": False,
-        "LR":  4e-4,
-        "ACTIVATION": "tanh",
-        "MAX_GRAD_NORM": 0.5,
-        "CLIP_EPS": 0.2,
-        "VF_COEF": 0.5,
-        "ENT_COEF": 0.01,
-        "GAMMA": 0.995,
-        "GAE_LAMBDA": 0.95,
-        "SEED": 0,
-        "ACTOR_ARCH": [64, 64],
-        "CRITIC_ARCH": [128, 128, 128],
-        "DISABLE_JIT": False,
-        "PROJECT": "single_quad_rl",
-        "NAME": f"quad_marl_{int(time.time())}",
-        "WANDB_MODE": "online"
-    }
+def deep_merge(default: dict, override: dict) -> dict:
+    for k, v in override.items():
+        if isinstance(v, dict) and isinstance(default.get(k), dict):
+            default[k] = deep_merge(default[k], v)
+        else:
+            default[k] = v
+    return default
+
+
+def main(config_file=None):
+    # Load default config and merge any runner override
+    default_path = os.path.join(project_root, "crazymarl", "configs", "defaults", "training.yaml")
+    with open(default_path, "r") as f:
+        default_cfg = yaml.safe_load(f)["training"]
+    if config_file:
+        with open(config_file, "r") as f:
+            override_cfg = yaml.safe_load(f)["training"]
+        config = deep_merge(default_cfg, override_cfg)
+    else:
+        config = default_cfg
+    # Append timestamp to experiment name
+    config["NAME"] = f"{config.get('NAME', 'quad_marl')}_{int(time.time())}"
+
     wandb.init(
         name=config["NAME"],
         project=config["PROJECT"],
@@ -164,22 +135,10 @@ def main():
         config=config,
         mode=config["WANDB_MODE"],
     )
-    # Merge any sweep overrides into config
-    config = {**config, **wandb.config}
+    # Deep-merge wandb overrides into the default config (preserve defaults)
+    config = deep_merge(config, dict(wandb.config))
 
-    # update nested keys from wandb.config with dot notation
-    def _update_nested_config(d, key, value):
-        keys = key.split('.')
-        target = d
-        for subkey in keys[:-1]:
-            if subkey not in target or not isinstance(target[subkey], dict):
-                target[subkey] = {}
-            target = target[subkey]
-        target[keys[-1]] = value
-
-    for k, v in wandb.config.items():
-        if '.' in k:
-            _update_nested_config(config, k, v)
+    print("Timesteps:", config["TOTAL_TIMESTEPS"])
 
     # terminate if num_steps*num_envs is too large, because of the GPU memory
     if config["NUM_STEPS"] * config["NUM_ENVS"] > 2048*2048:
@@ -204,7 +163,7 @@ def main():
     act_dim = env.action_spaces[env.agents[0]].shape[0]
 
     # create a dummy input for initializing modules
-    dummy_obs = jnp.zeros((1, obs_shape))
+    dummy_obs = jp.zeros((1, obs_shape))
 
     # Initialize actor
     actor = ActorModule(
@@ -231,7 +190,7 @@ def main():
         return {a: jp.squeeze(v, axis=0) for a, v in unbatched.items()}
 
     # Simulation: run an episode using the trained policy
-    sim_steps = 40000
+    sim_steps = 2000
     rng, rng_sim = jax.random.split(rng)
     state = env.reset(rng_sim)
     rollout = [state[1]]
@@ -309,4 +268,13 @@ def main():
     eval_results(env, jit_reset, jit_inference_fn, jit_step)
     
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config-file",
+        type=str,
+        help="Path to YAML config file, overrides the default"
+    )
+    args = parser.parse_args()
+    main(config_file=args.config_file)

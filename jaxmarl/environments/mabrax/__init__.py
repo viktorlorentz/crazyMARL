@@ -1,1 +1,3 @@
-from .mabrax_env import MABraxEnv, Ant, Humanoid, Hopper, Walker2d, HalfCheetah, MultiQuad, Quad
+from .mabrax_env import MultiQuad
+
+from crazymarl.envs import MultiQuadEnv
