@@ -171,6 +171,38 @@ class Experiment:
         arrs = [self.get_feature('others_rel_pos', i) for i in range(self.num_quads)]
         return np.stack(arrs, axis=2)
 
+    @property
+    def payload_pos(self) -> np.ndarray:
+        """
+        Absolute payload position relative to target: shape (timesteps, runs, 3).
+        """
+        # target position from environment config
+        tp = np.array(self.env_config['target_position'])  # (3,)
+        # trajectory is payload world positions (timesteps, runs, 3)
+        return self.trajectory - tp[None, None, :]
+
+    @property
+    def quad_pos(self) -> np.ndarray:
+        """
+        Absolute quad positions relative to target: shape (timesteps, runs, num_quads, 3).
+        """
+        # target position
+        tp = np.array(self.env_config['target_position'])  # (3,)
+        # payload world positions
+        payload_world = self.trajectory  # (T, runs, 3)
+        # quad positions relative to payload
+        rel = self.own_rel_pos        # (T, runs, Q, 3)
+        # quad world positions
+        quad_world = payload_world[:, :, None, :] + rel  # (T, runs, Q, 3)
+        return quad_world - tp[None, None, None, :]
+
+        """
+        Relative positions of other quads for each agent: 
+        shape (timesteps, runs, num_quads, 3*(num_quads-1)).
+        """
+        arrs = [self.get_feature('others_rel_pos', i) for i in range(self.num_quads)]
+        return np.stack(arrs, axis=2)
+
     def info(self):
         """
         Print detailed information about the experiment, including data shapes,
