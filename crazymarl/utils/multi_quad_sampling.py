@@ -28,7 +28,7 @@ def generate_configuration(
     mean_r, std_r = cable_length, cable_length / 3
     clip_r = (0.05, cable_length)
     mean_th, std_th = jp.pi / 4, jp.pi / 8
-    std_phi = jp.pi / (num_quads + 1)
+    std_phi = jp.pi / (3 * num_quads)
 
     r = jp.clip(
         mean_r + std_r * jax.random.normal(subkeys[2], (num_quads,)),
