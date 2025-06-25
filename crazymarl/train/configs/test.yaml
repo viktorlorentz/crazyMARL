@@ -1,0 +1,10 @@
+training:
+  ENV_KWARGS:
+    max_thrust_range: 0.15
+    num_quads: 2
+    cable_length: 0.3
+    payload_mass: 0.01
+  TOTAL_TIMESTEPS: 20000000
+  PROJECT: crazymarl_test
+  NAME: quad_marl_test
+  WANDB_MODE: disabled
