@@ -1,10 +1,13 @@
 import asdf
 import numpy as np
+from crazymarl.observations.multi_quad_observation import get_obs_index_lookup
 
 class Experiment:
     """
     Handles loading of ASDF file and provides lazy-loaded properties for observations,
     dones, dt, trajectory, and derived metrics while keeping the file open.
+    Uses index lookup for flexible feature slicing across any number of quads.
+    All convenience outputs are stacked over the quad dimension: (timesteps, runs, num_quads, feature_dim).
     """
     def __init__(self, file_path: str):
         self._file_path = file_path
@@ -14,8 +17,14 @@ class Experiment:
         self._dt = None
         self._trajectory = None
         self._first_dones = None
-        self._env_config = None
-        print(f"Experiment loaded from {file_path}")
+
+        # load env config and build index lookup
+        self._env_config = self._af['flights'][0]['metadata']['env_config']
+        self.num_quads = self._env_config['num_quads']
+        # global_ix not used directly here, but available
+        _, self.agent_ix = get_obs_index_lookup(self.num_quads)
+
+        print(f"Experiment loaded from {file_path} with {self.num_quads} quads")
 
     def __del__(self):
         try:
@@ -26,7 +35,10 @@ class Experiment:
     @property
     def obs(self) -> np.ndarray:
         if self._obs is None:
-            self._obs = np.array(self._af['flights'][0]['agents']['agent_0']['observations'])
+            # assume 'agent_0' stores full flattened obs
+            self._obs = np.array(
+                self._af['flights'][0]['agents']['agent_0']['observations']
+            )  # shape (timesteps, runs, features)
         return self._obs
 
     @property
@@ -34,24 +46,24 @@ class Experiment:
         if self._dones is None:
             self._dones = np.array(self._af['flights'][0]['global']['dones'])
         return self._dones
-    
+
     @property
     def env_config(self) -> dict:
-        if self._env_config is None:
-            self._env_config = self._af['flights'][0]['metadata']['env_config']
         return self._env_config
 
     @property
     def dt(self) -> float:
         if self._dt is None:
-            self.policy_freq = self.env_config['policy_freq']
-            self._dt =  1.0 / self.policy_freq
+            freq = self.env_config['policy_freq']
+            self._dt = 1.0 / freq
         return self._dt
 
     @property
     def trajectory(self) -> np.ndarray:
         if self._trajectory is None:
-            self._trajectory = np.array(self._af['flights'][0]['global']['trajectory'])
+            self._trajectory = np.array(
+                self._af['flights'][0]['global']['trajectory']
+            )
         return self._trajectory
 
     @property
@@ -73,64 +85,107 @@ class Experiment:
         return np.where(self.first_dones <= 2000)[0]
 
     @property
-    def payload(self) -> np.ndarray:
-        return self.obs[:, :, 0:3]
+    def agents(self) -> list:
+        """List of agent identifiers"""
+        return [f'agent_{i}' for i in range(self.num_quads)]
+
+    def get_feature(self, feature: str, agent: int) -> np.ndarray:
+        """
+        Returns a specific feature slice for given agent: shape (timesteps, runs, dim).
+        """
+        name = f'agent_{agent}'
+        idx = self.agent_ix[name][feature]
+        return self.obs[:, :, idx]
+
+    def get_agent_obs(self, agent: int) -> np.ndarray:
+        """
+        Full mapped observation for one agent: shape (timesteps, runs, obs_dim_agent).
+        """
+        return self.get_feature('full_mapped_obs', agent)
+
+    # --- stacked convenience properties ---
 
     @property
-    def payload_velocity(self) -> np.ndarray:
-        return self.obs[:, :, 3:6]
+    def payload_error(self) -> np.ndarray:
+        """
+        Payload error for each quad: shape (timesteps, runs, num_quads, 3).
+        """
+        # get for agent 0 then tile across quads
+        pe = self.get_feature('payload_error', 0)  # (T, R, 3)
+        return np.tile(pe[:, :, None, :], (1, 1, self.num_quads, 1))
 
     @property
-    def other_quads(self) -> np.ndarray:
-        return self.obs[:, :, 6:9]
+    def payload_linvel(self) -> np.ndarray:
+        """
+        Payload linear velocity for each quad: shape (timesteps, runs, num_quads, 3).
+        """
+        pl = self.get_feature('payload_linvel', 0)
+        return np.tile(pl[:, :, None, :], (1, 1, self.num_quads, 1))
 
     @property
-    def q_pos(self) -> np.ndarray:
-        return self.obs[:, :, 9:12]
+    def own_rel_pos(self) -> np.ndarray:
+        """
+        Own relative position for all quads: shape (timesteps, runs, num_quads, 3).
+        """
+        arrs = [self.get_feature('own_rel_pos', i) for i in range(self.num_quads)]
+        return np.stack(arrs, axis=2)
 
     @property
-    def q_rot_mat(self) -> np.ndarray:
-        return self.obs[:, :, 12:21]
+    def own_rot_flat(self) -> np.ndarray:
+        """
+        Own rotation flattened for all quads: shape (timesteps, runs, num_quads, 9).
+        """
+        arrs = [self.get_feature('own_rot_flat', i) for i in range(self.num_quads)]
+        return np.stack(arrs, axis=2)
 
     @property
-    def q_linvel(self) -> np.ndarray:
-        return self.obs[:, :, 21:24]
+    def own_linvel(self) -> np.ndarray:
+        """
+        Own linear velocity for all quads: shape (timesteps, runs, num_quads, 3).
+        """
+        arrs = [self.get_feature('own_linvel', i) for i in range(self.num_quads)]
+        return np.stack(arrs, axis=2)
 
     @property
-    def q_angvel(self) -> np.ndarray:
-        return self.obs[:, :, 24:27]
+    def own_angvel(self) -> np.ndarray:
+        """
+        Own angular velocity for all quads: shape (timesteps, runs, num_quads, 3).
+        """
+        arrs = [self.get_feature('own_angvel', i) for i in range(self.num_quads)]
+        return np.stack(arrs, axis=2)
 
     @property
-    def q_linacc(self) -> np.ndarray:
-        return self.obs[:, :, 27:30]
+    def own_action(self) -> np.ndarray:
+        """
+        Own last action for all quads: shape (timesteps, runs, num_quads, 4).
+        """
+        arrs = [self.get_feature('own_action', i) for i in range(self.num_quads)]
+        return np.stack(arrs, axis=2)
 
     @property
-    def q_angacc(self) -> np.ndarray:
-        return self.obs[:, :, 30:33]
-
-    @property
-    def q_last_action(self) -> np.ndarray:
-        return self.obs[:, :, 33:36]
+    def other_rel_pos(self) -> np.ndarray:
+        """
+        Relative positions of other quads for each agent: 
+        shape (timesteps, runs, num_quads, 3*(num_quads-1)).
+        """
+        arrs = [self.get_feature('others_rel_pos', i) for i in range(self.num_quads)]
+        return np.stack(arrs, axis=2)
 
     def info(self):
         """
         Print detailed information about the experiment, including data shapes,
         run counts, and timing.
         """
-        print(f"File path: {self._file_path}")
+        print(f"File: {self._file_path}")
+        print(f"Quads: {self.num_quads}")
         print(f"Timesteps: {self.obs.shape[0]}")
         print(f"Runs: {self.obs.shape[1]}")
-        print(f"Time step (dt): {self.dt}")
-        print(f"Total duration: {self.time[-1]:.3f} seconds")
-        print(f"First done indices per run: {self.first_dones}")
-        n_full = len(self.full_runs)
-        print(f"Full runs (>2000 steps): {n_full}/{self.obs.shape[1]} ({n_full/self.obs.shape[1]*100:.2f}%)")
-        print("Observation channel shapes:")
-        print(f"  payload: {self.payload.shape}")
-        print(f"  payload_velocity: {self.payload_velocity.shape}")
-        print(f"  other_quads: {self.other_quads.shape}")
-        print(f"  q_pos: {self.q_pos.shape}")
-        print(f"  q_rot_mat: {self.q_rot_mat.shape}")
-        print(f"  q_linvel: {self.q_linvel.shape}")
-        print(f"  q_angvel: {self.q_angvel.shape}")
-        print(f"  q_last_action: {self.q_last_action.shape}")
+        print(f"DT: {self.dt}")
+        print(f"Duration: {self.time[-1]:.3f}s")
+        print(f"First done per run: {self.first_dones}")
+        print(f"Full runs (>2000): {len(self.full_runs)}/{self.obs.shape[1]}")
+        print("Sample feature shapes:")
+        print(f" payload_error: {self.payload_error.shape}")
+        print(f" payload_linvel: {self.payload_linvel.shape}")
+        print(f" own_rel_pos: {self.own_rel_pos.shape}")
+        print(f" own_action: {self.own_action.shape}")

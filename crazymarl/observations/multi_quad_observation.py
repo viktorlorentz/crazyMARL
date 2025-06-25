@@ -139,3 +139,78 @@ def parse_obs(obs: jnp.ndarray, num_quads: int):
     actions    = per_quads[:, 18:22]
 
     return payload_error, payload_linvel, rel_pos, rots, linvels, angvels, actions
+
+
+def get_obs_index_lookup(num_quads: int):
+    """
+    Returns two dicts:
+      - global_ix: mapping each feature in the flat observation to a tuple of indices
+      - agent_ix: mapping each agent to its own feature-index dict
+    """
+    team_obs = 6
+    quad_obs = 22
+    global_ix = {}
+
+    # payload
+    global_ix['payload_error'] = tuple(range(0, 3))
+    global_ix['payload_linvel'] = tuple(range(3, 6))
+
+    # per-quad global indices
+    for i in range(num_quads):
+        base = team_obs + i * quad_obs
+        global_ix[f'quad_{i}_rel_pos'] = tuple(range(base, base + 3))
+        global_ix[f'quad_{i}_rot_flat'] = tuple(range(base + 3, base + 12))
+        global_ix[f'quad_{i}_linvel'] = tuple(range(base + 12, base + 15))
+        global_ix[f'quad_{i}_angvel'] = tuple(range(base + 15, base + 18))
+        global_ix[f'quad_{i}_action'] = tuple(range(base + 18, base + 22))
+
+    # aggregated across quads
+    global_ix['all_rel_pos'] = tuple(
+        idx for i in range(num_quads)
+        for idx in range(team_obs + i * quad_obs, team_obs + i * quad_obs + 3)
+    )
+    global_ix['all_rot_flat'] = tuple(
+        idx for i in range(num_quads)
+        for idx in range(team_obs + i * quad_obs + 3, team_obs + i * quad_obs + 12)
+    )
+    global_ix['all_linvel'] = tuple(
+        idx for i in range(num_quads)
+        for idx in range(team_obs + i * quad_obs + 12, team_obs + i * quad_obs + 15)
+    )
+    global_ix['all_angvel'] = tuple(
+        idx for i in range(num_quads)
+        for idx in range(team_obs + i * quad_obs + 15, team_obs + i * quad_obs + 18)
+    )
+    global_ix['all_action'] = tuple(
+        idx for i in range(num_quads)
+        for idx in range(team_obs + i * quad_obs + 18, team_obs + i * quad_obs + 22)
+    )
+
+    # per-agent mapped indices
+    action_map, dyn_ix = get_ix4_mappings(num_quads)
+    agent_ix = {}
+    for i in range(num_quads):
+        agent = f'agent_{i}'
+        # payload features are shared
+        feat_map = {
+            'payload_error': global_ix['payload_error'],
+            'payload_linvel': global_ix['payload_linvel'],
+        }
+        # own features
+        base = team_obs + i * quad_obs
+        feat_map['own_rel_pos'] = tuple(range(base, base + 3))
+        feat_map['own_rot_flat'] = tuple(range(base + 3, base + 12))
+        feat_map['own_linvel'] = tuple(range(base + 12, base + 15))
+        feat_map['own_angvel'] = tuple(range(base + 15, base + 18))
+        feat_map['own_action'] = tuple(range(base + 18, base + 22))
+        # other agents' rel_pos
+        feat_map['others_rel_pos'] = tuple(
+            idx for j in range(num_quads) if j != i
+            for idx in range(team_obs + j * quad_obs, team_obs + j * quad_obs + 3)
+        )
+        # full mapped observation indices for this agent
+        feat_map['full_mapped_obs'] = tuple(dyn_ix[agent].tolist())
+        feat_map['action_map'] = tuple(action_map[agent].tolist())
+        agent_ix[agent] = feat_map
+
+    return global_ix, agent_ix
