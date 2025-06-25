@@ -10,6 +10,7 @@ import jax.numpy as jnp
 from functools import partial
 
 #from .mappings import _agent_action_mapping, _agent_observation_mapping
+import crazymarl.envs
 
 from crazymarl.observations.multi_quad_observation import get_ix4_mappings
 
