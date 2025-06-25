@@ -42,7 +42,7 @@ def unbatchify(x: jnp.ndarray, agent_list, num_envs, num_actors):
 
 #------------------------------------------------------------------------------
 # Rendering utility
-def render_video(pipeline_states, env, env_config, fps=25, width=1920, height=1080, output="rollout_video.mp4"):    
+def render_video(state, env, env_config, fps=25, width=1920, height=1080, output="rollout_video.mp4"):    
     ctx = mujoco.GLContext(width, height)
     ctx.make_current()
     # Prepare directories for images
@@ -52,14 +52,14 @@ def render_video(pipeline_states, env, env_config, fps=25, width=1920, height=10
     os.makedirs(images_dir, exist_ok=True)
     print("Rendering rollout...")
     # Save first frame as PNG to images directory
-    first_frame = env.render(pipeline_states[:1], camera="track", width=width, height=height)[0]
+    first_frame = env.render(state[:1], camera="track", width=width, height=height)[0]
     png_name = os.path.join(images_dir, os.path.splitext(os.path.basename(output))[0] + "_first_frame.png")
     imageio.imwrite(png_name, first_frame)
     print(f"First frame saved to {png_name}")
   
     render_every = int(np.round(env_config["policy_freq"] / fps))
 
-    frames = env.render(pipeline_states[::render_every], camera="track", width=width, height=height)
+    frames = env.render(state[::render_every], camera="track", width=width, height=height)
     imageio.mimsave(output, frames, fps=fps)
     print(f"Video saved to {output}")
 
@@ -79,6 +79,10 @@ def load_model(model_path: str) -> tf.lite.Interpreter:
 
 #------------------------------------------------------------------------------
 def run_batched_rollout(interpreter: tf.lite.Interpreter, env, num_envs: int, env_config: dict):
+    ids = env.env.ids # get mjx ids for the environment
+    
+    print(f"ENV IDS: {env.env.ids}")
+
     agents = env.agents
     obs_dim = env.observation_spaces[agents[0]].shape[0]
     print(f"Running batched rollout with {num_envs} environments and {len(agents)} agents.")
@@ -95,11 +99,12 @@ def run_batched_rollout(interpreter: tf.lite.Interpreter, env, num_envs: int, en
     # Batch reset to get initial states
     rng = jax.random.PRNGKey(0)
     keys = jax.random.split(rng, num_envs)
-    obs_batched, pipeline_states = jax.vmap(env.reset)(keys)
+    obs_batched, state = jax.vmap(env.reset)(keys)
 
     obs_buf, act_buf, rew_buf, done_buf = [], [], [], []
     vm_step = jax.vmap(env.step_env, in_axes=(0, 0, 0))
 
+    payload_buf = []  # <-- new: collect payload positions each step
     for _ in range(timesteps):
         # Record observations
         obs_stack = np.stack([np.array(obs_batched[a]) for a in agents], axis=1)
@@ -118,17 +123,23 @@ def run_batched_rollout(interpreter: tf.lite.Interpreter, env, num_envs: int, en
         # Step environments
         rng, *step_keys = jax.random.split(rng, num_envs + 1)
         step_keys = jnp.stack(step_keys)
-        obs_batched, pipeline_states, rewards, dones, _ = vm_step(
-            step_keys, pipeline_states, raw_acts
+        obs_batched, state, rewards, dones, _ = vm_step(
+            step_keys, state, raw_acts
         )
+
         rew_buf.append(np.array(rewards["__all__"]))
         done_buf.append(np.array(dones["__all__"]))
+        # record payload_pos for all envs
+        payload_buf.append(
+            np.array(state.pipeline_state.xpos[:, ids["payload_body_id"], :])
+        )
 
     return (
         np.stack(obs_buf),
         np.stack(act_buf),
         np.stack(rew_buf),
         np.stack(done_buf),
+        np.stack(payload_buf),
         agents
     )
 
@@ -169,7 +180,7 @@ def run_single_rollout(interpreter: tf.lite.Interpreter, env, env_config: dict):
     return states
 
 #------------------------------------------------------------------------------
-def save_rollout(obs_h, act_h, rew_h, done_h, model_path, output, num_envs, agents, env_config):
+def save_rollout(obs_h, act_h, rew_h, done_h, payload_h, model_path, output, num_envs, agents, env_config):
     agents_dict = {
         agents[i]: {"observations": obs_h[:, :, i, :], "actions": act_h[:, :, i, :]}
         for i in range(len(agents))
@@ -194,7 +205,10 @@ def save_rollout(obs_h, act_h, rew_h, done_h, model_path, output, num_envs, agen
             "global": {
                 "rewards": rew_h,
                 "dones": done_h,
-                "trajectory": env_config.get("trajectory")  # keep trajectory field
+                "trajectory": env_config.get("trajectory"),  # keep trajectory field
+                "state": {
+                    "payload_pos": payload_h,  # storing payload positions
+                }
             },
         }]
     }
@@ -261,11 +275,11 @@ def record_experiment(
     env = jaxmarl.make("multiquad_ix4", **env_config)
 
     # Batched rollout and save
-    obs_h, act_h, rew_h, done_h, agents = run_batched_rollout(
+    obs_h, act_h, rew_h, done_h, payload_h, agents = run_batched_rollout(
         interpreter, env, num_envs, env_config
     )
     save_rollout(
-        obs_h, act_h, rew_h, done_h,
+        obs_h, act_h, rew_h, done_h, payload_h,
         model_path, asdf_file, num_envs, agents, env_config
     )
 
@@ -283,77 +297,6 @@ def record_experiment(
     # return the directory for further processing if needed
     return base_dir
 
-
-
-
-# def _old_main():
-#     default_config = {
-#         "policy_freq": 250.0,              # Policy frequency in Hz.
-#         "sim_steps_per_action": 1,         # Physics steps between control actions.
-#         "obs_noise": 0.0,                  # Parameter for observation noise
-#         "act_noise": 0.0,                  # Parameter for actuator noise
-#         "max_thrust_range": 0.15,           # Range for randomizing thrust
-#         "num_quads": 2,
-#         "cable_length": 0.3,               # Length of the cable connecting the payload to the quadrotors.
-#         "trajectory": None,                # Array of target positions for the payload
-#         "target_start_ratio": 0.2,         # Percentage of resets to target position
-#         "payload_mass": 0.01,              # Mass of the payload.
-#         "auto_reset": False,             # Whether to automatically reset the environment when an episode ends.
-#     }
-
-
-    
-#     figure_eight_config = {
-#         **default_config,
-#         "episode_length": 5000,
-#         "trajectory": figure_eight(5000),
-#         "target_start_ratio": 1.0,  # Start at the target position
-#     }
-
-#     recovery_config = {
-#         **default_config,
-#         "episode_length": 2500,
-#         "trajectory": np.array([0,0,1.5]), # Single target position
-#         "target_start_ratio": 0.0,  # Start randomly, not at target
-#     }
-
-#     quad_ovverrides = { 
-#         # 1: {
-#         #     "num_quads": 1,
-#         # },
-#         2: {
-#             "num_quads": 2,
-#         },
-#         # 3: {
-#         #     "num_quads": 3,
-#         # },
-#         # 5: {
-#         #     "num_quads": 5,
-#         #     "payload_mass": 0.05,  # Increase payload mass for more quads
-#         # },
-#     }
-
-#     for num_quads, overrides in quad_ovverrides.items():
-#         # construct model path for this quad count
-#         model_path = f"trained_policies/{num_quads}_quad_policy.tflite"
-
-#         # figure‐eight experiment
-#         fe_config = {**figure_eight_config, **overrides}
-#         record_experiment(
-#             experiment_name=f"{num_quads}_quads_figure_eight",
-#             model_path=model_path,
-#             num_envs=100,
-#             env_config=fe_config
-#         )
-
-#         # recovery experiment
-#         rec_config = {**recovery_config, **overrides}
-#         record_experiment(
-#             experiment_name=f"{num_quads}_quads_recovery",
-#             model_path=model_path,
-#             num_envs=1000,
-#             env_config=rec_config
-#         )
 def main():
     parser = argparse.ArgumentParser(description="Run flight experiment from YAML config")
     parser.add_argument("--config", type=str, required=True, help="Config file name (without extension) or path to YAML")

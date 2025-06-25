@@ -17,6 +17,7 @@ class Experiment:
         self._dt = None
         self._trajectory = None
         self._first_dones = None
+        self._payload_pos = None
 
         # load env config and build index lookup
         self._env_config = self._af['flights'][0]['metadata']['env_config']
@@ -35,10 +36,15 @@ class Experiment:
     @property
     def obs(self) -> np.ndarray:
         if self._obs is None:
-            # assume 'agent_0' stores full flattened obs
-            self._obs = np.array(
-                self._af['flights'][0]['agents']['agent_0']['observations']
-            )  # shape (timesteps, runs, features)
+            # load per-agent observations and concatenate to full flat obs
+            flights = self._af['flights'][0]['agents']
+            obs_list = []
+            for i in range(self.num_quads):
+                agent_key = f'agent_{i}'
+                obs_i = np.array(flights[agent_key]['observations'])  # (T, runs, per_agent_dim)
+                obs_list.append(obs_i)
+            # concatenate along feature axis
+            self._obs = np.concatenate(obs_list, axis=2)  # (T, runs, full_dim)
         return self._obs
 
     @property
@@ -78,11 +84,12 @@ class Experiment:
 
     @property
     def full_runs(self) -> np.ndarray:
-        return np.where(self.first_dones > 2000)[0]
+        # number of runs where first done is last timestep
+        return np.where(self.first_dones > self.first_dones.shape[0] - 1)[0]
 
     @property
     def failed_runs(self) -> np.ndarray:
-        return np.where(self.first_dones <= 2000)[0]
+        return np.where(self.first_dones <= self.first_dones.shape[0] - 1)[0]
 
     @property
     def agents(self) -> list:
@@ -174,34 +181,23 @@ class Experiment:
     @property
     def payload_pos(self) -> np.ndarray:
         """
-        Absolute payload position relative to target: shape (timesteps, runs, 3).
+        Absolute payload position in world frame per run: shape (timesteps, runs, 3).
         """
-        # target position from environment config
-        tp = np.array(self.env_config['target_position'])  # (3,)
-        # trajectory is payload world positions (timesteps, runs, 3)
-        return self.trajectory - tp[None, None, :]
+        if self._payload_pos is None:
+            self._payload_pos = np.array(
+                self._af['flights'][0]['global']['state']['payload_pos']
+            )
+        return self._payload_pos
 
     @property
     def quad_pos(self) -> np.ndarray:
         """
-        Absolute quad positions relative to target: shape (timesteps, runs, num_quads, 3).
+        Absolute quad positions in world frame: shape (timesteps, runs, num_quads, 3).
         """
-        # target position
-        tp = np.array(self.env_config['target_position'])  # (3,)
-        # payload world positions
-        payload_world = self.trajectory  # (T, runs, 3)
-        # quad positions relative to payload
-        rel = self.own_rel_pos        # (T, runs, Q, 3)
-        # quad world positions
-        quad_world = payload_world[:, :, None, :] + rel  # (T, runs, Q, 3)
-        return quad_world - tp[None, None, None, :]
-
-        """
-        Relative positions of other quads for each agent: 
-        shape (timesteps, runs, num_quads, 3*(num_quads-1)).
-        """
-        arrs = [self.get_feature('others_rel_pos', i) for i in range(self.num_quads)]
-        return np.stack(arrs, axis=2)
+        payload_world = self.payload_pos  # (T, runs, 3)
+        rel = self.own_rel_pos           # (T, runs, Q, 3)
+        return payload_world[:, :, None, :] + rel
+ 
 
     def info(self):
         """
@@ -216,8 +212,13 @@ class Experiment:
         print(f"Duration: {self.time[-1]:.3f}s")
         print(f"First done per run: {self.first_dones}")
         print(f"Full runs (>2000): {len(self.full_runs)}/{self.obs.shape[1]}")
+        print(f" trajectory: {self.trajectory.shape if self.trajectory is not None else 'None'}")
         print("Sample feature shapes:")
         print(f" payload_error: {self.payload_error.shape}")
         print(f" payload_linvel: {self.payload_linvel.shape}")
         print(f" own_rel_pos: {self.own_rel_pos.shape}")
         print(f" own_action: {self.own_action.shape}")
+        print(f" other_rel_pos: {self.other_rel_pos.shape}")
+        print(f" quad_pos: {self.quad_pos.shape}")
+
+
