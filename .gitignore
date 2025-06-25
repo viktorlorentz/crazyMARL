@@ -24,8 +24,8 @@ models/
 *.mp4
 *.tflite
 
-!experiments_data/**/*.png
-!experiments_data/**/*.mp4
-!experiments_data/**/*.tflite
-!experiments_data/**/*.asdf
+# !experiments_data/**/*.png
+# !experiments_data/**/*.mp4
+# !experiments_data/**/*.tflite
+# !experiments_data/**/*.asdf
 jit_*
