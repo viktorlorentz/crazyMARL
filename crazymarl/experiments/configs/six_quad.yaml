@@ -1,8 +1,0 @@
-training:
-  ENV_KWARGS:
-    max_thrust_range: 0.15
-    num_quads: 6
-    cable_length: 0.45
-    payload_mass: 0.04
-  TOTAL_TIMESTEPS: 3000000000
-  
