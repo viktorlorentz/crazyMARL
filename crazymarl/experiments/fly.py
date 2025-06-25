@@ -297,59 +297,61 @@ def record_experiment(
     # return the directory for further processing if needed
     return base_dir
 
+
 def main():
     parser = argparse.ArgumentParser(description="Run flight experiment from YAML config")
-    parser.add_argument("--config", type=str, required=True, help="Config file name (without extension) or path to YAML")
-    parser.add_argument("--model-path", type=str, required=False, default=None, help="Path to TFLite model file (defaults to trained_policies based on num_quads)")
-    # only parse --config and --model-path; leave other CLI args for OmegaConf
+    # accept both --num-quads and --num_quads
+    parser.add_argument("--config", type=str, required=True,
+                        help="Config file name (without extension) or path to YAML")
+    parser.add_argument("--model-path", type=str, default=None,
+                        help="Path to TFLite model file (defaults to trained_policies based on num_quads)")
+    parser.add_argument("--num-quads", "--num_quads", dest="num_quads",
+                        type=int, required=False,
+                        help="Override flights.num_quads")
     args, unknown = parser.parse_known_args()
 
-    # load YAML configs
     config_dir = os.path.join(os.getcwd(), "crazymarl", "experiments", "configs")
     default_path = os.path.join(config_dir, "default.yaml")
     default_conf = OmegaConf.load(default_path)
-    # determine config file path
     cfg = args.config
     config_path = cfg if os.path.isabs(cfg) else os.path.join(config_dir, f"{cfg}.yaml")
     custom_conf = OmegaConf.load(config_path)
-    # initial merge of default and custom
     merged_conf = OmegaConf.merge(default_conf, custom_conf)
-    # merge CLI overrides (unknown args) into config
+
+    # merge CLI overrides
     if unknown:
         cli_conf = OmegaConf.from_cli(unknown)
         merged_conf = OmegaConf.merge(merged_conf, cli_conf)
-    # load per-quads overrides based on merged flights.num_quads
-    quad_dir = os.path.join(config_dir, "num_quads")
+
+    # ensure num_quads is set
+    if args.num_quads is not None:
+        merged_conf.flights.num_quads = args.num_quads
+    if not hasattr(merged_conf.flights, 'num_quads'):
+        raise ValueError("Please specify --num-quads or add num_quads under 'flights:' in your config.")
+
     n = merged_conf.flights.num_quads
+    # load per-quad overrides
+    quad_dir = os.path.join(config_dir, "num_quads")
     quad_path = os.path.join(quad_dir, f"{n}.yaml")
     if os.path.isfile(quad_path):
         override_conf = OmegaConf.load(quad_path)
         merged_conf = OmegaConf.merge(merged_conf, override_conf)
 
-    # convert to plain dict and extract flights section
     container = OmegaConf.to_container(merged_conf, resolve=True)
     env_config = container['flights']
-    # handle figure_eight trajectory
+
     traj_type = env_config.get('trajectory_type')
     if traj_type == 'figure_eight':
         env_config['trajectory'] = figure_eight(env_config['episode_length'])
     elif traj_type == 'recovery':
-        # single target position [0,0,z]
         env_config['trajectory'] = np.array([0, 0, 1.5])
-    # remove trajectory_type key
     env_config.pop('trajectory_type', None)
 
-    # determine num_envs from config and then remove it
     num_envs = env_config.get('num_envs')
     env_config.pop('num_envs', None)
-    # determine model path (default to trained_policies dir)
-    num_quads = n
-    model_path = args.model_path or os.path.join(os.getcwd(), "trained_policies", f"{num_quads}_quad_policy.tflite")
-    # run experiment
-    experiment_name = f"{num_quads}_quads_{cfg}"
+    model_path = args.model_path or os.path.join(os.getcwd(), "trained_policies", f"{n}_quad_policy.tflite")
+    experiment_name = f"{n}_quads_{cfg}"
     record_experiment(experiment_name, model_path, num_envs, env_config)
 
 if __name__ == "__main__":
     main()
-
-
