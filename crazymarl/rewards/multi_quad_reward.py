@@ -34,7 +34,7 @@ def calc_reward(
     vel_dir = jp.where(jp.abs(vel) > 1e-6, payload_linlv / vel, jp.zeros_like(payload_linlv))
   
 
-    aligned_vel = er(1 - jp.dot(vel_dir, target_dir), jp.minimum(40 * dis, 2)) # dotprod = 1  => vel is perfectly aligned
+    aligned_vel = er(1 - jp.dot(vel_dir, target_dir), jp.minimum(40 * dis, 4)) # dotprod = 1  => vel is perfectly aligned
     tracking_reward += aligned_vel
 
     tracking_reward /=2 # normalize tracking reward to be in [0, 1]
@@ -74,7 +74,7 @@ def calc_reward(
 
     # This function computes the velocity reward based on the distance, current and maximum velocities. 
     # Close to the target it only alows low velocity and further in allows up to max_vel
-    vel_reward_function = lambda vel, max_vel: jp.exp(-((vel / (jp.minimum(10 * dis, 1) + 0.02)) / max_vel) ** 8)
+    vel_reward_function = lambda vel, max_vel: jp.exp(-((vel / (jp.minimum(3 * dis, 1) + 0.02)) / max_vel) ** 8)
 
     linvel_quad_reward  = jp.mean(vel_reward_function(jp.linalg.norm(linvels, axis=-1), 2.0)) #quad max 2m/s
     payload_velocity_reward = vel_reward_function(jp.linalg.norm(payload_linlv), 1.5) #payload max 1.5m/s
