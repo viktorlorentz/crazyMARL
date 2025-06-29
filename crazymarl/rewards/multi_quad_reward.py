@@ -65,15 +65,20 @@ def calc_reward(
 
     # angular & linear velocity
     vel_shaping = jp.maximum(4.0 * er(dis, 100.0), 0.01 ) # low velocity tolerance close to the target
-    ang_norms = jp.linalg.norm(angvels, axis=-1)
+
+    
+ 
+
     yaw_vels = jp.linalg.norm(angvels[:, 2]) # only yaw velocity matters
-    lin_norms = jp.linalg.norm(linvels, axis=-1)
-    safe_linvel = jp.exp(- (0.4 * lin_norms)**4) # no reward for high linear velocities
     ang_vel_reward      = jp.mean(er(yaw_vels))
-    linvel_quad_reward  = jp.mean(er(lin_norms, vel_shaping) * safe_linvel)
-    payload_linlv_norm = jp.linalg.norm(payload_linlv)
-    safe_quad_linvel = jp.exp(- (0.6 * payload_linlv_norm)**4) # no reward for high linear velocities
-    payload_velocity_reward = er(payload_linlv_norm, vel_shaping) * safe_quad_linvel
+
+    # This function computes the velocity reward based on the distance, current and maximum velocities. 
+    # Close to the target it only alows low velocity and further in allows up to max_vel
+    vel_reward_function = lambda vel, max_vel: jp.exp(-((vel / (jp.minimum(10 * dis, 1) + 0.02)) / max_vel) ** 8)
+
+    linvel_quad_reward  = vel_reward_function(jp.linalg.norm(linvels, axis=-1), 2.0) #quad max 2m/s
+    payload_velocity_reward = vel_reward_function(jp.linalg.norm(payload_linlv), 1.5) #payload max 1.5m/s
+
 
     # penalties
     collision_penalty = cfg.reward_coeffs["collision_penalty_coef"] * collision
