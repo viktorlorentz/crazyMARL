@@ -57,23 +57,22 @@ def build_obs(
     obs = jnp.concatenate([base_obs, flat_quads], axis=0) # (6 + Q*22,)
 
     # --- optional noise ---
-    # def add_noise(o):
-    #     # build a lookup scale vector once
-    #     payload_scale = jnp.concatenate([jnp.ones(3)*0.005, jnp.ones(3)*0.05])
-    #     per_quad_scale = jnp.concatenate([
-    #         jnp.ones(3)*0.02,  # rel pos
-    #         jnp.ones(9)*0.005, # rot
-    #         jnp.ones(3)*0.05,  # linvel
-    #         jnp.ones(3)*0.08,  # angvel
-    #         jnp.ones(4)*0.05   # actions
-    #     ])  # (22,)
-    #     noise_per_quad = jnp.tile(per_quad_scale, (num_quads,))  # (Q*22,)
-    #     tail_scale = jnp.zeros(num_quads*4)                     # no noise on tail
-    #     lookup = jnp.concatenate([payload_scale, noise_per_quad, tail_scale], axis=0)
-    #     n = jax.random.normal(noise_key, o.shape)
-    #     return o + obs_noise * lookup * n
+    def add_noise(o):
+        # build a lookup scale vector once
+        payload_scale = jnp.concatenate([jnp.ones(3)*0.005, jnp.ones(3)*0.05])
+        per_quad_scale = jnp.concatenate([
+            jnp.ones(3)*0.02,  # rel pos
+            jnp.ones(9)*0.01, # rot
+            jnp.ones(3)*0.05,  # linvel
+            jnp.ones(3)*0.1,  # angvel
+            jnp.ones(4)*0.0   # actions
+        ])  # (22,)
+        noise_per_quad = jnp.tile(per_quad_scale, (num_quads,))  # (Q*22,)
+        lookup = jnp.concatenate([payload_scale, noise_per_quad], axis=0)  # match obs length
+        n = jax.random.normal(noise_key, o.shape)
+        return o + obs_noise * lookup * n
 
-    # obs = lax.cond(obs_noise > 0.0, add_noise, lambda o: o, obs)
+    obs = lax.cond(obs_noise > 0.0, add_noise, lambda o: o, obs)
     return obs
 
 
@@ -213,4 +212,5 @@ def get_obs_index_lookup(num_quads: int):
         feat_map['action_map'] = tuple(action_map[agent].tolist())
         agent_ix[agent] = feat_map
 
+    return global_ix, agent_ix
     return global_ix, agent_ix

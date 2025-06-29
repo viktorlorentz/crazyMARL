@@ -1,0 +1,6 @@
+flights:
+  episode_length: 2500
+  target_start_ratio: 0.0
+  num_envs: 1000
+  obs_noise: 1.0
+
