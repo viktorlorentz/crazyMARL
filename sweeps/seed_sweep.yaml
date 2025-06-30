@@ -1,16 +1,12 @@
+program: "crazymarl/train/train.py"
+method: grid
 
-program: "crazymarl/train/train.py"    
-method: grid                            
 parameters:
-  config:
-    value: "single_quad"               
-  SEED:
-    values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]  # grid over seeds
+  seed:
+    values: [0,1,2,3,4,5,6,7,8,9]
 
-# custom command to include both config and sweep params
 command:
   - python
   - ${program}
   - "--config"
-  - ${config}
-  - ${args}                           
+  - "single_quad"
