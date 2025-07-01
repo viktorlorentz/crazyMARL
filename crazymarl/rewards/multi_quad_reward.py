@@ -94,7 +94,7 @@ def calc_reward(
     action_diff = jp.mean(per_quad_action_diff)  
     thrust_deviations = jp.mean(per_quad_thrust_deviations) 
     #smoothness_bonus = jp.mean(er(per_quad_action_diff, 50)) + jp.mean(er(per_quad_thrust_deviations, 50)) 
-    smooth_penalty = 0.5 * (action_diff + thrust_deviations) # - smoothness_bonus
+    smooth_penalty =  action_diff + thrust_deviations # - smoothness_bonus
     smooth_penalty  *= cfg.reward_coeffs["smooth_action_coef"] 
 
     thrust_cmds = 0.5 * (actions + 1.0)
