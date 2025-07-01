@@ -84,10 +84,16 @@ def calc_reward(
     collision_penalty = cfg.reward_coeffs["collision_penalty_coef"] * collision
     oob_penalty       = cfg.reward_coeffs["out_of_bounds_penalty_coef"] * out_of_bounds
 
+    per_quad_actions = action.reshape((cfg.num_quads, -1))  # (Q,4)
+    per_quad_last_actions = last_action.reshape((cfg.num_quads, -1))  # (Q,4)
+
+
+
     # action differences
-    action_diff= jp.abs(action - last_action)
-    thrust_deviations= jp.abs(action - jp.mean(action, axis=0)) # mean deviation from the mean action
-    smooth_penalty  = cfg.reward_coeffs["smooth_action_coef"] * 0.5*(jp.mean(action_diff) + jp.mean(thrust_deviations) )
+    per_quad_action_diff = jp.abs(per_quad_actions - per_quad_last_actions)  # (Q,4)
+    per_quad_thrust_deviations = jp.abs(per_quad_actions - jp.mean(per_quad_actions, axis=1))  # (Q,4)
+    smooth_penalty  = cfg.reward_coeffs["smooth_action_coef"] * 0.5 * (jp.mean(per_quad_action_diff) + jp.mean(per_quad_thrust_deviations))
+
     thrust_cmds = 0.5 * (action + 1.0)
     thrust_extremes = jp.exp(-50 * jp.abs(thrust_cmds)) + jp.exp(50 * (thrust_cmds - 1)) # 1 if thrust_cmds is 0 or 1 and going to 0 in the middle
     # if actions out of bounds lead them to action space
