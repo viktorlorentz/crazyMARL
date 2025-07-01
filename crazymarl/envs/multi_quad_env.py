@@ -103,8 +103,7 @@ class MultiQuadEnv(PipelineEnv):
     def step(self, state: State, action: jax.Array) -> State:
         cfg = self.cfg
    
-        # Extract previous action from the observation.
-        prev_last_action = state.obs[-self.sys.nu:]
+       
         # Scale actions from [-1, 1] to thrust commands in [0, max_thrust].
         max_thrust = state.metrics['max_thrust']
         thrust_cmds = 0.5 * (action + 1.0)
@@ -174,7 +173,7 @@ class MultiQuadEnv(PipelineEnv):
 
 
         obs = build_obs(ps, action, target_position, cfg.obs_noise, noise_key, self.ids)
-        reward = calc_reward(obs, ps.time, collision, out_of_bounds, action, angles, prev_last_action, target_position, ps, max_thrust, cfg)
+        reward = calc_reward(obs, ps.time, collision, out_of_bounds, action, angles, target_position, ps, max_thrust, cfg)
 
         # dont terminate ground collision on ground start
         ground_collision = jp.logical_and(
