@@ -94,7 +94,11 @@ def calc_reward(
     per_quad_thrust_deviations = jp.abs(
         per_quad_actions - jp.mean(per_quad_actions, axis=1, keepdims=True)
     )  # (Q,4)
-    smooth_penalty  = cfg.reward_coeffs["smooth_action_coef"] * 0.5 * (jp.mean(per_quad_action_diff) + jp.mean(per_quad_thrust_deviations))
+    action_diff = jp.mean(per_quad_action_diff)  
+    thrust_deviations = jp.mean(per_quad_thrust_deviations) 
+    smoothness_bonus = jp.mean(er(per_quad_action_diff, 50)) + jp.mean(er(per_quad_thrust_deviations, 50)) 
+    smooth_penalty = 0.5 * (action_diff + thrust_deviations) - smoothness_bonus 
+    smooth_penalty  *= cfg.reward_coeffs["smooth_action_coef"] 
 
     thrust_cmds = 0.5 * (action + 1.0)
     thrust_extremes = jp.exp(-50 * jp.abs(thrust_cmds)) + jp.exp(50 * (thrust_cmds - 1)) # 1 if thrust_cmds is 0 or 1 and going to 0 in the middle
