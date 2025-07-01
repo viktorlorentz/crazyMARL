@@ -1,2 +1,4 @@
 flights:
   num_quads: 3
+  cable_length: 0.3
+  payload_mass: 0.03
