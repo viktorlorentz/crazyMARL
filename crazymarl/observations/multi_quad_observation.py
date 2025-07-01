@@ -148,6 +148,7 @@ def get_obs_index_lookup(num_quads: int):
     """
     team_obs = 6
     quad_obs = 22
+    rel_pos_obs_size = 3 * (num_quads - 1)  # relative positions of other quads
     global_ix = {}
 
     # payload
@@ -196,21 +197,18 @@ def get_obs_index_lookup(num_quads: int):
             'payload_linvel': global_ix['payload_linvel'],
         }
         # own features
-        base = team_obs + i * quad_obs
-        feat_map['own_rel_pos'] = tuple(range(base, base + 3))
-        feat_map['own_rot_flat'] = tuple(range(base + 3, base + 12))
-        feat_map['own_linvel'] = tuple(range(base + 12, base + 15))
-        feat_map['own_angvel'] = tuple(range(base + 15, base + 18))
-        feat_map['own_action'] = tuple(range(base + 18, base + 22))
+        base = team_obs 
+        feat_map['agent_rel_pos'] = tuple(range(base, base + 3))
+     
+        feat_map['agent_rot_flat'] = tuple(range(base + 3, base + 12))
+        feat_map['agent_linvel'] = tuple(range(base + 12, base + 15))
+        feat_map['agent_angvel'] = tuple(range(base + 15, base + 18))
+        feat_map['agent_action'] = tuple(range(base + 18, base + 22))
         # other agents' rel_pos
-        feat_map['others_rel_pos'] = tuple(
-            idx for j in range(num_quads) if j != i
-            for idx in range(team_obs + j * quad_obs, team_obs + j * quad_obs + 3)
-        )
+        feat_map['agent_others_rel_pos'] = tuple(range(base + 22, base + 22 + rel_pos_obs_size))
         # full mapped observation indices for this agent
         feat_map['full_mapped_obs'] = tuple(dyn_ix[agent].tolist())
         feat_map['action_map'] = tuple(action_map[agent].tolist())
         agent_ix[agent] = feat_map
 
-    return global_ix, agent_ix
     return global_ix, agent_ix
