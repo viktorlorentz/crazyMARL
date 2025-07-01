@@ -97,11 +97,10 @@ def calc_reward(
     smooth_penalty = 0.5 * (action_diff + thrust_deviations) # - smoothness_bonus
     smooth_penalty  *= cfg.reward_coeffs["smooth_action_coef"] 
 
-    flat_actions = actions.reshape(-1)  # (Q*4,)
-    thrust_cmds = 0.5 * (flat_actions + 1.0)
+    thrust_cmds = 0.5 * (actions + 1.0)
     thrust_extremes = jp.exp(-50 * jp.abs(thrust_cmds)) + jp.exp(50 * (thrust_cmds - 1)) # 1 if thrust_cmds is 0 or 1 and going to 0 in the middle
     # if actions out of bounds lead them to action space
-    thrust_extremes = jp.where(jp.abs(flat_actions)> 1.0, 1.0 + 0.1*jp.abs(flat_actions), thrust_extremes)  
+    thrust_extremes = jp.where(jp.abs(actions)> 1.0, 1.0 + 0.1*jp.abs(actions), thrust_extremes)  
 
     energy_penalty    = cfg.reward_coeffs["action_energy_coef"] * jp.mean(thrust_extremes)
 
