@@ -33,7 +33,7 @@ def calc_reward(
     vel_dir = jp.where(jp.abs(vel) > 1e-6, payload_linlv / vel, jp.zeros_like(payload_linlv))
   
 
-    aligned_vel = er(1 - jp.dot(vel_dir, target_dir), jp.minimum(40 * dis, 4)) # dotprod = 1  => vel is perfectly aligned
+    aligned_vel = er(1 - jp.dot(vel_dir, target_dir), jp.minimum(40 * dis, 2)) # dotprod = 1  => vel is perfectly aligned
     tracking_reward += aligned_vel
 
     tracking_reward /=2 # normalize tracking reward to be in [0, 1]
@@ -94,7 +94,7 @@ def calc_reward(
     action_diff = jp.mean(per_quad_action_diff)  
     thrust_deviations = jp.mean(per_quad_thrust_deviations) 
     #smoothness_bonus = jp.mean(er(per_quad_action_diff, 50)) + jp.mean(er(per_quad_thrust_deviations, 50)) 
-    smooth_penalty =  action_diff + thrust_deviations # - smoothness_bonus
+    smooth_penalty =  0.5*(action_diff + thrust_deviations) # - smoothness_bonus
     smooth_penalty  *= cfg.reward_coeffs["smooth_action_coef"] 
 
     thrust_cmds = 0.5 * (actions + 1.0)
