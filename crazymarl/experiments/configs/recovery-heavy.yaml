@@ -1,0 +1,6 @@
+flights:
+  episode_length: 2500
+  target_start_ratio: 0.0
+  num_envs: 1000
+  max_thrust_range: 0.0  # Range for randomizing thrust
+  payload_mass: 0.02  # Mass of the payload
