@@ -176,17 +176,30 @@ class QuadEnvGenerator:
             "mode": self.camera_mode,
         })
 
+        # Decide where and how to attach quads depending on cable_length
+        # If cable_length == 0, attach quads as rigid (weld) children of payload;
+        # otherwise leave them free in worldbody and use tendons below.
+        quad_parent = wb
+        use_tendons = True
+        if self.cable_length == 0:
+            quad_parent = p
+            use_tendons = False
+
         # N quads
         for i in range(self.n):
             theta = 2 * math.pi * i / self.n
             x = self.frame_radius * math.cos(theta)
             y = self.frame_radius * math.sin(theta)
-            base = ET.SubElement(wb, "body", {
+            base = ET.SubElement(quad_parent, "body", {
                 "name": f"q{i}_container",
                 "pos": f"{x:.3f} {y:.3f} {self.payload_height + 0.1}"
             })
+            # If no cables, weld quad container rigidly to payload; otherwise leave it free
+            joint_type = "weld" if not use_tendons else "free"
             ET.SubElement(base, "joint", {
-                "name": f"q{i}_joint", "type": "free", "actuatorfrclimited": "false"
+                "name": f"q{i}_joint",
+                "type": joint_type,
+                "actuatorfrclimited": "false"
             })
             ET.SubElement(base, "site", {
                 "name": f"q{i}_attachment", "pos": "0 0 0", "group": "5"
@@ -217,22 +230,24 @@ class QuadEnvGenerator:
                     "pos": f"{0.032527*sx:.6f} {0.032527*sy:.6f} 0"
                 })
 
-        # tendons
-        td = ET.SubElement(mj, "tendon")
-        # generate hues for distinct tendon colors
-        hues = list(i / self.n for i in range(self.n))
+        # optionally add tendons if cable_length > 0
+        if use_tendons:
+            td = ET.SubElement(mj, "tendon")
+            # generate hues for distinct tendon colors
+            hues = [i / self.n for i in range(self.n)]
 
-        for i in range(self.n):
-            h = hues[i]
-            r, g, b = colorsys.hsv_to_rgb(h, 0.7, 1.0)
-            rgba = f"{r:.3f} {g:.3f} {b:.3f} 1"
-            sp = ET.SubElement(td, "spatial", {
-                "name": f"q{i}_tendon", "limited": "true",
-                "range": f"0 {self.cable_length}",
-                "width": str(self.tendon_width), "rgba": rgba
-            })
-            ET.SubElement(sp, "site", {"site": f"q{i}_attachment"})
-            ET.SubElement(sp, "site", {"site": "payload_s"})
+            for i, h in enumerate(hues):
+                r, g, b = colorsys.hsv_to_rgb(h, 0.7, 1.0)
+                rgba = f"{r:.3f} {g:.3f} {b:.3f} 1"
+                sp = ET.SubElement(td, "spatial", {
+                    "name": f"q{i}_tendon",
+                    "limited": "true",
+                    "range": f"0 {self.cable_length}",
+                    "width": str(self.tendon_width),
+                    "rgba": rgba,
+                })
+                ET.SubElement(sp, "site", {"site": f"q{i}_attachment"})
+                ET.SubElement(sp, "site", {"site": "payload_s"})
 
         # actuators
         act = ET.SubElement(mj, "actuator")
