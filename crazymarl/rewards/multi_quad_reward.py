@@ -68,8 +68,8 @@ def calc_reward(
     
  
 
-    yaw_vels = jp.linalg.norm(angvels[:, 2]) # only yaw velocity matters
-    ang_vel_reward      = jp.mean(er(yaw_vels))
+    yaw_vels = angvels[:, 2] # only yaw velocity matters
+    ang_vel_reward      = jp.mean(er(yaw_vels)-0.1*yaw_vels**2) # penalize high yaw velocities, reward low ones
 
     # This function computes the velocity reward based on the distance, current and maximum velocities. 
     # Close to the target it only alows low velocity and further in allows up to max_vel
