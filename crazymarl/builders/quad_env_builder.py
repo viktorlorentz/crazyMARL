@@ -176,14 +176,12 @@ class QuadEnvGenerator:
             "mode": self.camera_mode,
         })
 
-        # Decide where and how to attach quads depending on cable_length
-        # If cable_length == 0, attach quads as rigid (weld) children of payload;
-        # otherwise leave them free in worldbody and use tendons below.
+        # If cable_length == 0, we'll parent each quad under the payload
+        # and omit any <joint>, so they're rigidly welded.
         quad_parent = wb
-        use_tendons = True
         if self.cable_length == 0:
             quad_parent = p
-            use_tendons = False
+        use_tendons = (self.cable_length > 0)
 
         # N quads
         for i in range(self.n):
@@ -194,13 +192,13 @@ class QuadEnvGenerator:
                 "name": f"q{i}_container",
                 "pos": f"{x:.3f} {y:.3f} {self.payload_height + 0.1}"
             })
-            # If no cables, weld quad container rigidly to payload; otherwise leave it free
-            joint_type = "weld" if not use_tendons else "free"
-            ET.SubElement(base, "joint", {
-                "name": f"q{i}_joint",
-                "type": joint_type,
-                "actuatorfrclimited": "false"
-            })
+            # Only add a free-floating joint when we're using cables.
+            if use_tendons:
+                ET.SubElement(base, "joint", {
+                    "name": f"q{i}_joint",
+                    "type": "free",
+                    "actuatorfrclimited": "false"
+                })
             ET.SubElement(base, "site", {
                 "name": f"q{i}_attachment", "pos": "0 0 0", "group": "5"
             })
@@ -230,7 +228,7 @@ class QuadEnvGenerator:
                     "pos": f"{0.032527*sx:.6f} {0.032527*sy:.6f} 0"
                 })
 
-        # optionally add tendons if cable_length > 0
+        # optionally add tendons if cable_length > 0 (same as use_tendons)
         if use_tendons:
             td = ET.SubElement(mj, "tendon")
             # generate hues for distinct tendon colors
