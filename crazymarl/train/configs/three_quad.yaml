@@ -3,6 +3,6 @@ training:
     max_thrust_range: 0.15
     num_quads: 3
     cable_length: 0.3
-    payload_mass: 0.03
+    payload_mass: 0.02
   TOTAL_TIMESTEPS: 2000000000
   
