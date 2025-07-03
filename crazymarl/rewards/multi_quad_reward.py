@@ -9,9 +9,8 @@ def calc_reward(
     sim_time: float,
     collision: bool,
     out_of_bounds: bool,
-    action: jp.ndarray,
+    actions: jp.ndarray,
     angles: jp.ndarray,
-    last_action: jp.ndarray,
     target_position: jp.ndarray,
     data,
     max_thrust: float,
@@ -23,7 +22,7 @@ def calc_reward(
     er = lambda x, s=2: jp.exp(-s * jp.abs(x))
 
     # extract obs components
-    payload_err, payload_linlv, rels, rots, linvels, angvels, prev_last_actions = parse_obs(obs, cfg.num_quads)
+    payload_err, payload_linlv, rels, rots, linvels, angvels, last_actions = parse_obs(obs, cfg.num_quads)
     dis = jp.linalg.norm(payload_err)
     tracking_reward = cfg.reward_coeffs["distance_reward_coef"] * er(dis)
 
@@ -34,7 +33,7 @@ def calc_reward(
     vel_dir = jp.where(jp.abs(vel) > 1e-6, payload_linlv / vel, jp.zeros_like(payload_linlv))
   
 
-    aligned_vel = er(1 - jp.dot(vel_dir, target_dir), jp.minimum(40 * dis, 4)) # dotprod = 1  => vel is perfectly aligned
+    aligned_vel = er(1 - jp.dot(vel_dir, target_dir), jp.minimum(40 * dis, 2)) # dotprod = 1  => vel is perfectly aligned
     tracking_reward += aligned_vel
 
     tracking_reward /=2 # normalize tracking reward to be in [0, 1]
@@ -69,8 +68,8 @@ def calc_reward(
     
  
 
-    yaw_vels = jp.linalg.norm(angvels[:, 2]) # only yaw velocity matters
-    ang_vel_reward      = jp.mean(er(yaw_vels))
+    yaw_vels = angvels[:, 2] # only yaw velocity matters
+    ang_vel_reward      = jp.mean(er(yaw_vels)-0.1*yaw_vels**2) # penalize high yaw velocities, reward low ones
 
     # This function computes the velocity reward based on the distance, current and maximum velocities. 
     # Close to the target it only alows low velocity and further in allows up to max_vel
@@ -84,14 +83,24 @@ def calc_reward(
     collision_penalty = cfg.reward_coeffs["collision_penalty_coef"] * collision
     oob_penalty       = cfg.reward_coeffs["out_of_bounds_penalty_coef"] * out_of_bounds
 
+    per_quad_actions = actions.reshape((cfg.num_quads, 4))  # (Q,4)
+    per_quad_last_actions = last_actions  # (Q,4)
+
     # action differences
-    action_diff= jp.abs(action - last_action)
-    thrust_deviations= jp.abs(action - jp.mean(action, axis=0)) # mean deviation from the mean action
-    smooth_penalty  = cfg.reward_coeffs["smooth_action_coef"] * 0.5*(jp.mean(action_diff) + jp.mean(thrust_deviations) )
-    thrust_cmds = 0.5 * (action + 1.0)
+    per_quad_action_diff = jp.abs(per_quad_actions - per_quad_last_actions)  # (Q,4)
+    per_quad_thrust_deviations = jp.abs(
+        per_quad_actions - jp.mean(per_quad_actions, axis=1, keepdims=True)
+    )  # (Q,4)
+    action_diff = jp.mean(per_quad_action_diff)  
+    thrust_deviations = jp.mean(per_quad_thrust_deviations) 
+    #smoothness_bonus = jp.mean(er(per_quad_action_diff, 50)) + jp.mean(er(per_quad_thrust_deviations, 50)) 
+    smooth_penalty =  0.5*(action_diff + thrust_deviations) # - smoothness_bonus
+    smooth_penalty  *= cfg.reward_coeffs["smooth_action_coef"] 
+
+    thrust_cmds = 0.5 * (actions + 1.0)
     thrust_extremes = jp.exp(-50 * jp.abs(thrust_cmds)) + jp.exp(50 * (thrust_cmds - 1)) # 1 if thrust_cmds is 0 or 1 and going to 0 in the middle
     # if actions out of bounds lead them to action space
-    thrust_extremes = jp.where(jp.abs(action)> 1.0, 1.0 + 0.1*jp.abs(action), thrust_extremes)  
+    thrust_extremes = jp.where(jp.abs(actions)> 1.0, 1.0 + 0.1*jp.abs(actions), thrust_extremes)  
 
     energy_penalty    = cfg.reward_coeffs["action_energy_coef"] * jp.mean(thrust_extremes)
 

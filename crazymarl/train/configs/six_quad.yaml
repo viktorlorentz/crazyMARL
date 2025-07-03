@@ -5,4 +5,13 @@ training:
     cable_length: 0.45
     payload_mass: 0.04
   TOTAL_TIMESTEPS: 3000000000
-  
+  ACTOR_ARCH:
+    - 128
+    - 128
+    - 64
+    - 64
+  CRITIC_ARCH:
+    - 256
+    - 256
+    - 128
+    - 128
