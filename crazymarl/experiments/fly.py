@@ -21,6 +21,8 @@ from omegaconf import OmegaConf
 
 import crazymarl.envs
 
+SEED= 42
+
 #------------------------------------------------------------------------------
 # Vendored batchify / unbatchify (no external deps)
 def batchify(x: dict, agent_list, num_actors):
@@ -97,7 +99,7 @@ def run_batched_rollout(interpreter: tf.lite.Interpreter, env, num_envs: int, en
     out_idx = interpreter.get_output_details()[0]["index"]
 
     # Batch reset to get initial states
-    rng = jax.random.PRNGKey(0)
+    rng = jax.random.PRNGKey(SEED)
     keys = jax.random.split(rng, num_envs)
     obs_batched, state = jax.vmap(env.reset)(keys)
 
@@ -156,7 +158,7 @@ def run_single_rollout(interpreter: tf.lite.Interpreter, env, env_config: dict):
     inp_idx = interpreter.get_input_details()[0]["index"]
     out_idx = interpreter.get_output_details()[0]["index"]
 
-    rng = jax.random.PRNGKey(1)
+    rng = jax.random.PRNGKey(SEED)
     obs, state = env.reset(rng)
     states = []
     for _ in range(timesteps):
