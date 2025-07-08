@@ -1,0 +1,4 @@
+flights:
+  num_quads: 6
+  cable_length: 0.45
+  payload_mass: 0.04
