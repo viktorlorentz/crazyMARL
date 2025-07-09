@@ -3,6 +3,8 @@ flights:
   target_start_ratio: 0.0
   num_envs: 1000
   payload: false
-
+  obs_noise: 1.0
+  act_noise: 0.1
+  
 # to use run:
 #   python -m crazymarl.train --config recovery-no-payload --num-quads 1
