@@ -5,8 +5,8 @@ training:
     cable_length: 0.3
     payload_mass: 0.01
     payload: false  # Set to False for no payload
-    obs_noise: 0.2
-    act_noise: 0.1
+    obs_noise: 1.0
+    act_noise: 0.15
     reward_coeffs:
       distance_reward_coef: 1.0
       velocity_reward_coef: 1.0
