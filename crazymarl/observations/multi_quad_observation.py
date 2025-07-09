@@ -1,11 +1,12 @@
 import jax
 import jax.numpy as jnp
 from jax import vmap, lax
+from functools import partial
 from brax import base
 from crazymarl.utils.multi_quad_utils import R_from_quat
 
 
-@jax.jit
+@partial(jax.jit, static_argnums=(6,))
 def build_obs(
     data: base.State,
     last_action: jnp.ndarray,       # shape (num_quads, 4)
@@ -13,14 +14,22 @@ def build_obs(
     obs_noise: float,
     noise_key: jax.Array,
     ids: dict,
+    payload=True,
 ) -> jnp.ndarray:
-    # --- payload part ---
-    payload_pos = data.xpos[ids["payload_body_id"]]                   # (3,)
-    payload_linvel = data.cvel[ids["payload_body_id"], 3:6]           # (3,)
-    err = target_position - payload_pos                              # (3,)
-    dist = jnp.linalg.norm(err)
-    payload_error = err / jnp.maximum(dist, 1.0)                      # (3,)
-    # this make sure the payload error is capped to a unit vector
+    
+    if payload:
+        # --- payload part ---
+        payload_pos = data.xpos[ids["payload_body_id"]]                   # (3,)
+        payload_linvel = data.cvel[ids["payload_body_id"], 3:6]           # (3,)
+        err = target_position - payload_pos                              # (3,)
+        dist = jnp.linalg.norm(err)
+        payload_error = err / jnp.maximum(dist, 1.0)                      # (3,)
+        # this make sure the payload error is capped to a unit vector
+    else:
+        # if no payload, just use zero vectors
+        payload_pos = jnp.zeros(3)
+        payload_linvel = jnp.zeros(3)
+        payload_error = jnp.zeros(3)
 
     # --- per-quad quantities (vectorized) ---
     quad_ids = jnp.array(ids["quad_body_ids"], dtype=int)             # (Q,)
@@ -50,6 +59,13 @@ def build_obs(
 
     # flatten payload + quads
     flat_quads = per_quad.reshape(-1)                                 # (Q*22,)
+
+    if not payload:
+        payload_error = target_position - quad_pos[0, :]  # use first quad pos as target for now
+        payload_linvel = linvels[0, :]  # use first quad linvel as target for now
+
+        rel_pos = jnp.zeros_like(rel_pos)  # zero rel pos if no payload
+        linvels = jnp.zeros_like(payload_linvel)  # zero linvels if no payload
 
 
     base_obs = jnp.concatenate([payload_error, payload_linvel], axis=0)  # (6,)

@@ -16,12 +16,20 @@ class MultiQuadEnv(PipelineEnv):
         for _k in ('backend', 'n_frames', 'episode_length'):
             kwargs.pop(_k, None)
         cfg = MultiQuadConfig(**kwargs)
+
+        if not cfg.payload:
+            cfg.payload_mass = 0.0
+            cfg.cable_length = 0.0
+            if cfg.num_quads > 1:
+                raise NotImplementedError("Quad swarms without payload not yet supported. MultiQuadEnv requires payload for multiple quads. Set payload=True in config.")
+
         sys = make_brax_system(
             cfg.num_quads,
             cfg.cable_length,
             cfg.payload_mass,
             cfg.policy_freq,
-            cfg.sim_steps_per_action
+            cfg.sim_steps_per_action,
+            cfg.payload,
         )
 
         self.num_quads = cfg.num_quads
@@ -89,7 +97,8 @@ class MultiQuadEnv(PipelineEnv):
         quats = jp.stack(quats)
 
         qpos = base_qpos
-        qpos = qpos.at[self.ids["payload_qpos_start"]:self.ids["payload_qpos_start"]+3].set(payload_pos)
+        if cfg.payload:
+            qpos = qpos.at[self.ids["payload_qpos_start"]:self.ids["payload_qpos_start"]+3].set(payload_pos)
         for i,s in enumerate(self.ids["quad_qpos_starts"]):
             qpos = qpos.at[s:s+3].set(quad_pos[i])
             qpos = qpos.at[s+3:s+7].set(quats[i])
@@ -97,7 +106,7 @@ class MultiQuadEnv(PipelineEnv):
         ps = self.pipeline_init(qpos, qvel)
         last_act = jp.zeros(self.sys.nu)
         rng, nk = jax.random.split(rng)
-        obs = build_obs(ps, last_act, self.target_position, cfg.obs_noise, nk, self.ids)
+        obs = build_obs(ps, last_act, self.target_position, cfg.obs_noise, nk, self.ids, payload=cfg.payload)
         return State(ps, obs, jp.array(0.0), jp.array(0.0), {'time': ps.time, 'reward': 0.0, 'max_thrust': max_thrust})
 
     def step(self, state: State, action: jax.Array) -> State:
@@ -141,14 +150,20 @@ class MultiQuadEnv(PipelineEnv):
 
         # ground collision if any quads AND payload near ground
         ground_collision_quad    = jp.any(qp[:, 2] < 0.03)
-        ground_collision_payload = ps.xpos[self.ids["payload_body_id"]][2] < 0.03
-        ground_collision = jp.logical_or(ground_collision_quad, ground_collision_payload)
+        if cfg.payload:
+            ground_collision_payload = ps.xpos[self.ids["payload_body_id"]][2] < 0.03
+            ground_collision = jp.logical_or(ground_collision_quad, ground_collision_payload)
+        else:
+            ground_collision = ground_collision_quad
         collision       = jp.logical_or(quad_collision, ground_collision)
 
         # out-of-bounds if any quad tilts too far or goes under payload
         too_tilted = jp.any(jp.abs(angles) > jp.radians(150))
-        below_pl   = jp.any(qp[:, 2] < ps.xpos[self.ids["payload_body_id"]][2] - 0.15)
-        out_of_bounds = jp.logical_or(too_tilted, below_pl)
+        if cfg.payload:
+            below_pl   = jp.any(qp[:, 2] < ps.xpos[self.ids["payload_body_id"]][2] - 0.15)
+            out_of_bounds = jp.logical_or(too_tilted, below_pl)
+        else:
+            out_of_bounds = too_tilted
 
         # out of bounds for pos error shrinking with time
         # payload_pos = ps.xpos[self.payload_body_id]
@@ -172,17 +187,23 @@ class MultiQuadEnv(PipelineEnv):
 
 
 
-        obs = build_obs(ps, action, target_position, cfg.obs_noise, noise_key, self.ids)
+        obs = build_obs(ps, action, target_position, cfg.obs_noise, noise_key, self.ids, payload=cfg.payload)
         reward = calc_reward(obs, ps.time, collision, out_of_bounds, action, angles, target_position, ps, max_thrust, cfg)
 
         # dont terminate ground collision on ground start
-        ground_collision = jp.logical_and(
-        ground_collision,
-        jp.logical_or(
-            ps.time > 3, # allow 2 seconds for takeoff
-            ps.cvel[self.ids["payload_body_id"]][2] < -3.0,
-        )
-        )
+        if cfg.payload:
+            ground_collision = jp.logical_and(
+                ground_collision,
+                jp.logical_or(
+                    ps.time > 3, # allow 2 seconds for takeoff
+                    ps.cvel[self.ids["payload_body_id"]][2] < -3.0,
+                )
+            )
+        else:
+            ground_collision = jp.logical_and(
+                ground_collision,
+                ps.time > 1, # allow 1 seconds for takeoff
+            )
 
         collision = jp.logical_or(quad_collision, ground_collision)
         

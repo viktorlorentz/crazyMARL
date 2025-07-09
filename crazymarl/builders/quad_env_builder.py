@@ -33,12 +33,14 @@ class QuadEnvGenerator:
         camera_pos: str = "-0.7 0 0.5",
         camera_quat: str = "0.601501 0.371748 -0.371748 -0.601501",
         camera_mode: str = "trackcom",
+        payload: bool = True,
     ):
         self.n = n_quads
         self.cable_length = cable_length
         self.tendon_width = tendon_width
         self.payload_height = payload_height
         self.payload_mass = payload_mass
+        self.payload = payload
         self.frame_radius = frame_radius
         self.mesh_dir = mesh_dir
         self.mesh_names = mesh_names or [f"cf2_{i}" for i in range(7)]
@@ -153,28 +155,29 @@ class QuadEnvGenerator:
             "pos": "0 0 1.5", "dir": "0 0 -1", "directional": "true"
         })
 
-        # payload body + free joint + geom + site
-        p = ET.SubElement(wb, "body", {
-            "name": "payload", "pos": f"0 0 {self.payload_height}"
-        })
-        ET.SubElement(p, "joint", {
-            "name": "payload_joint", "type": "free",
-            "actuatorfrclimited": "false", "damping": "0.00001"
-        })
-        ET.SubElement(p, "geom", {
-            "type": "sphere", "size": "0.01",
-            "mass": str(self.payload_mass),
-            "rgba": "0.8 0.8 0.8 1"
-        })
-        ET.SubElement(p, "site", {"name": "payload_s", "pos": "0 0 0.01"})
-
-        # <-- HERE: insert the default 'track' camera -->
-        ET.SubElement(p, "camera", {
-            "name": "track",
-            "pos": self.camera_pos,
-            "quat": self.camera_quat,
-            "mode": self.camera_mode,
-        })
+   
+        if self.payload:
+            # payload body + free joint + geom + site
+            p = ET.SubElement(wb, "body", {
+                "name": "payload", "pos": f"0 0 {self.payload_height}"
+            })
+            ET.SubElement(p, "joint", {
+                "name": "payload_joint", "type": "free",
+                "actuatorfrclimited": "false", "damping": "0.00001"
+            })
+            ET.SubElement(p, "geom", {
+                "type": "sphere", "size": "0.01",
+                "mass": str(self.payload_mass),
+                "rgba": "0.8 0.8 0.8 1"
+            })
+            ET.SubElement(p, "site", {"name": "payload_s", "pos": "0 0 0.01"})
+            # camera on payload
+            ET.SubElement(p, "camera", {
+                "name": "track",
+                "pos": self.camera_pos,
+                "quat": self.camera_quat,
+                "mode": self.camera_mode,
+            })
 
         # N quads
         for i in range(self.n):
@@ -216,23 +219,32 @@ class QuadEnvGenerator:
                     "name": f"q{i}_thrust{lbl}",
                     "pos": f"{0.032527*sx:.6f} {0.032527*sy:.6f} 0"
                 })
+            # attach camera to first quad if no payload
+            if not self.payload and i == 0:
+                ET.SubElement(base, "camera", {
+                    "name": "track",
+                    "pos": self.camera_pos,
+                    "quat": self.camera_quat,
+                    "mode": self.camera_mode,
+                })
 
-        # tendons
-        td = ET.SubElement(mj, "tendon")
-        # generate hues for distinct tendon colors
-        hues = list(i / self.n for i in range(self.n))
+        # <-- wrap tendon creation -->
+        if self.payload:
+            td = ET.SubElement(mj, "tendon")
+            # generate hues for distinct tendon colors
+            hues = list(i / self.n for i in range(self.n))
 
-        for i in range(self.n):
-            h = hues[i]
-            r, g, b = colorsys.hsv_to_rgb(h, 0.7, 1.0)
-            rgba = f"{r:.3f} {g:.3f} {b:.3f} 1"
-            sp = ET.SubElement(td, "spatial", {
-                "name": f"q{i}_tendon", "limited": "true",
-                "range": f"0 {self.cable_length}",
-                "width": str(self.tendon_width), "rgba": rgba
-            })
-            ET.SubElement(sp, "site", {"site": f"q{i}_attachment"})
-            ET.SubElement(sp, "site", {"site": "payload_s"})
+            for i in range(self.n):
+                h = hues[i]
+                r, g, b = colorsys.hsv_to_rgb(h, 0.7, 1.0)
+                rgba = f"{r:.3f} {g:.3f} {b:.3f} 1"
+                sp = ET.SubElement(td, "spatial", {
+                    "name": f"q{i}_tendon", "limited": "true",
+                    "range": f"0 {self.cable_length}",
+                    "width": str(self.tendon_width), "rgba": rgba
+                })
+                ET.SubElement(sp, "site", {"site": f"q{i}_attachment"})
+                ET.SubElement(sp, "site", {"site": "payload_s"})
 
         # actuators
         act = ET.SubElement(mj, "actuator")
@@ -263,7 +275,8 @@ def make_brax_system(
     cable_length: float,
     payload_mass: float,
     policy_freq: float,
-    sim_steps_per_action: int
+    sim_steps_per_action: int,
+    payload: bool = True
 ):
     """
     Generate a Brax system from a MuJoCo XML as a MJX backend.
@@ -271,7 +284,8 @@ def make_brax_system(
     gen = QuadEnvGenerator(
         n_quads=num_quads,
         cable_length=cable_length,
-        payload_mass=payload_mass
+        payload_mass=payload_mass,
+        payload=payload
     )
     xml = gen.generate_xml()
     mj_model = mujoco.MjModel.from_xml_string(xml)

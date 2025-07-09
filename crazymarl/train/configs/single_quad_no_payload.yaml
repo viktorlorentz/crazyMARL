@@ -2,8 +2,9 @@ training:
   ENV_KWARGS:
     max_thrust_range: 0.2
     num_quads: 1
-    cable_length: 0
-    payload_mass: 0
+    cable_length: 0.3
+    payload_mass: 0.01
+    payload: false  # Set to False for no payload
     reward_coeffs:
       distance_reward_coef: 1.0
       velocity_reward_coef: 1.0
@@ -17,5 +18,5 @@ training:
       out_of_bounds_penalty_coef: -10.0
       smooth_action_coef: -20.0
       action_energy_coef: -1.0
-  TOTAL_TIMESTEPS: 200000000
+  TOTAL_TIMESTEPS: 1000000000
   

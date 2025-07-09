@@ -60,7 +60,11 @@ def calc_reward(
     # taut-string reward = sum of distances + heights
     quad_dists   = jp.linalg.norm(rels, axis=-1)
     quad_heights = rels[:, 2]
-    taut_reward  = (jp.mean(quad_dists) + 5 * jp.mean(quad_heights)) / cfg.cable_length
+    taut_reward = jp.where(
+        cfg.cable_length < 0.02,
+        1.0,
+        (jp.mean(quad_dists) + 5 * jp.mean(quad_heights)) / cfg.cable_length
+    )
 
     # angular & linear velocity
     vel_shaping = jp.maximum(4.0 * er(dis, 100.0), 0.01 ) # low velocity tolerance close to the target
