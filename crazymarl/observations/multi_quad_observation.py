@@ -20,7 +20,9 @@ def build_obs(
     if payload:
         # --- payload part ---
         payload_pos = data.xpos[ids["payload_body_id"]]                   # (3,)
-        payload_linvel = data.cvel[ids["payload_body_id"], 3:6]           # (3,)
+        # use payload_dofadr instead of body_id
+        pd = ids["payload_dofadr"]
+        payload_linvel = data.qvel[pd : pd + 3]            # (3,)
         err = target_position - payload_pos                              # (3,)
         dist = jnp.linalg.norm(err)
         payload_error = err / jnp.maximum(dist, 1.0)                      # (3,)
@@ -45,8 +47,15 @@ def build_obs(
     rots_flat = rots.reshape(num_quads, -1)                           # (Q,9)
 
     # velocities
-    linvels = data.cvel[quad_ids, 3:6]                                # (Q,3)
-    angvels = data.cvel[quad_ids, 0:3]                                # (Q,3)
+   
+
+    from jax import lax
+    qds = jnp.array(ids["quad_dofadr"], dtype=int)  # (Q,)
+    linvels = vmap(lambda d: lax.dynamic_slice(data.qvel, (d,), (3,)))(qds)
+    angvels = vmap(lambda d: lax.dynamic_slice(data.qvel, (d + 3,), (3,)))(qds)
+
+    
+    
 
     # last action, clipped
     clipped_actions = last_action.reshape((num_quads, 4))

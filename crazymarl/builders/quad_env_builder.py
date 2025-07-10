@@ -299,6 +299,7 @@ def make_brax_system(
 def get_body_and_joint_ids(sys, num_quads):
     model = sys.mj_model
 
+    # Quad body & joint IDs
     quad_body_ids = [
         mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY.value, f"q{i}_container")
         for i in range(num_quads)
@@ -307,23 +308,28 @@ def get_body_and_joint_ids(sys, num_quads):
         mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT.value, f"q{i}_joint")
         for i in range(num_quads)
     ]
-    quad_qpos_starts = [model.jnt_qposadr[j] for j in quad_joint_ids]
 
-    payload_body_id = mujoco.mj_name2id(
-        model, mujoco.mjtObj.mjOBJ_BODY.value, "payload"
-    )
-    payload_joint_id = mujoco.mj_name2id(
-        model, mujoco.mjtObj.mjOBJ_JOINT.value, "payload_joint"
-    )
+    # qpos start indices (as before) and now dofadr start indices for qvel
+    quad_qpos_starts = [model.jnt_qposadr[j] for j in quad_joint_ids]
+    quad_dofadr     = [model.jnt_dofadr[j]   for j in quad_joint_ids] 
+
+    # Payload body & joint IDs
+    payload_body_id  = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY.value, "payload")
+    payload_joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT.value, "payload_joint")
+
+    # qpos start and dofadr for payload
     payload_qpos_start = model.jnt_qposadr[payload_joint_id]
+    payload_dofadr     = model.jnt_dofadr[payload_joint_id]          
 
     return {
-        "quad_body_ids": quad_body_ids,
-        "quad_joint_ids": quad_joint_ids,
-        "quad_qpos_starts": quad_qpos_starts,
-        "payload_body_id": payload_body_id,
-        "payload_joint_id": payload_joint_id,
+        "quad_body_ids":      quad_body_ids,
+        "quad_joint_ids":     quad_joint_ids,
+        "quad_qpos_starts":   quad_qpos_starts,
+        "quad_dofadr":        quad_dofadr,          
+        "payload_body_id":    payload_body_id,
+        "payload_joint_id":   payload_joint_id,
         "payload_qpos_start": payload_qpos_start,
+        "payload_dofadr":     payload_dofadr,       
     }
 
 # def compute_obs_table(n):
