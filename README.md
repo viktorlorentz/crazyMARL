@@ -10,6 +10,26 @@ crazyMARL is a framework for multi-agent reinforcement learning experiments with
 - Experiment tracking with ASDF format and Weights & Biases integration
 - Docker-based development environment for reproducible setups
 
+## Trained Policies
+We provide several trained IPPO policies for different scenarios:
+- `single_quad_no_payload`: Single quadcopter trained to recover from harsh conditions and track position setpoint
+- `single_quad_payload`: Single quadcopter trained to carry a payload and track position setpoint with payload
+- `two_quad`: Two quadcopters trained to cooperatively track a position setpoint with payload
+- `three_quad`: Three quadcopters trained to cooperatively track a position setpoint with payload
+
+The results can be seen in these videos:
+
+<table>
+  <tr>
+    <td><img src="media/1_quads_recovery-no-payload.gif" alt="single_quad_no_payload"></td>
+    <td><img src="media/1_quads_recovery.gif" alt="single_quad_payload"></td>
+    <td><img src="media/2_quads_recovery.gif" alt="two_quad"></td>
+    <td><img src="media/2_quads_figure_eight.gif" alt="two_quad_figure_eight"></td>
+    <td><img src="media/3_quads_recovery.gif" alt="three_quad"></td>
+  </tr>
+</table>
+
+
 ## Installation
 **Clone and install:**
 ```bash
