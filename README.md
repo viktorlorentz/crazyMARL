@@ -19,17 +19,13 @@ We provide several trained IPPO policies for different scenarios:
 
 The results can be seen in these videos:
 
-<table>
+<table style="padding:0px;">
   <tr>
-    <td><img src="media/1_quads_recovery-no-payload.gif" alt="single_quad_no_payload"></td>
-    <td><img src="media/1_quads_recovery.gif" alt="single_quad_payload"></td>
-  </tr>
-  <tr>
-    <td><img src="media/2_quads_recovery.gif" alt="two_quad"></td>
-    <td><img src="media/3_quads_recovery.gif" alt="three_quad"></td>
-  </tr>
-  <tr>
-       <td><img src="media/2_quads_figure_eight.gif" alt="two_quad_figure_eight"></td>
+    <td style="padding:2px;"><img src="media/1_quads_recovery-no-payload.gif" alt="single_quad_no_payload"></td>
+    <td style="padding:2px;"><img src="media/1_quads_recovery.gif" alt="single_quad_payload"></td>
+    <td style="padding:2px;"><img src="media/2_quads_recovery.gif" alt="two_quad"></td>
+    <td style="padding:2px;"><img src="media/2_quads_figure_eight.gif" alt="two_quad_figure_eight"></td>
+    <td style="padding:2px;"><img src="media/3_quads_recovery.gif" alt="three_quad"></td>
   </tr>
 </table>
 
