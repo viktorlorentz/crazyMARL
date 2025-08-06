@@ -48,7 +48,7 @@ class MultiQuadEnv(PipelineEnv):
             self.target_position = self.trajectory[0]
         self.ids = get_body_and_joint_ids(sys, num_quads=self.num_quads)
 
-        self.alpha = jp.exp(-self.dt / self.tau)
+        self.alpha = jp.exp(-self.dt / cfg.motor_tau)
 
 
     def reset(self, rng: jax.Array) -> State:
