@@ -24,6 +24,9 @@ class MultiQuadConfig:
     target_start_ratio: float = 0.1
     trajectory: Optional[Any] = None
 
+    # Motor parameters
+    tau = 0.015                     # motor time constant (s)
+
     # Reward coefficients
     reward_coeffs: Dict[str, float] = field(default_factory=lambda: {
         "distance_reward_coef": 0.0,

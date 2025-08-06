@@ -48,6 +48,8 @@ class MultiQuadEnv(PipelineEnv):
             self.target_position = self.trajectory[0]
         self.ids = get_body_and_joint_ids(sys, num_quads=self.num_quads)
 
+        self.alpha = jp.exp(-self.dt / self.tau)
+
 
     def reset(self, rng: jax.Array) -> State:
         cfg = self.cfg
@@ -107,7 +109,10 @@ class MultiQuadEnv(PipelineEnv):
         last_act = jp.zeros(self.sys.nu)
         rng, nk = jax.random.split(rng)
         obs = build_obs(ps, last_act, self.target_position, cfg.obs_noise, nk, self.ids, payload=cfg.payload)
-        return State(ps, obs, jp.array(0.0), jp.array(0.0), {'time': ps.time, 'reward': 0.0, 'max_thrust': max_thrust})
+        return State(ps, obs, jp.array(0.0), jp.array(0.0), 
+                     {'time': ps.time,
+                      'reward': 0.0, 'max_thrust': max_thrust,
+                      'last_filtered_action': last_act})
 
     def step(self, state: State, action: jax.Array) -> State:
         cfg = self.cfg
@@ -119,8 +124,13 @@ class MultiQuadEnv(PipelineEnv):
         thrust_cmds = jp.clip(thrust_cmds, 0.0, 1.0)
         action_scaled = thrust_cmds * max_thrust
 
- 
-        ps = self.pipeline_step(state.pipeline_state, action_scaled)
+        filtered_action = (
+            self.alpha * state.metrics['last_filtered_action']
+            + (1 - self.alpha) * action_scaled
+        )
+
+        ps = self.pipeline_step(state.pipeline_state, filtered_action)
+
 
         # Generate a dynamic noise_key using pipeline_state fields.
         noise_key = jax.random.PRNGKey(0)
@@ -215,7 +225,8 @@ class MultiQuadEnv(PipelineEnv):
         metrics = {
         'time': ps.time,
         'reward': reward,
-        'max_thrust': state.metrics['max_thrust']
+        'max_thrust': state.metrics['max_thrust'],
+        'last_filtered_action': filtered_action,
         }
         return state.replace(pipeline_state=ps, obs=obs, reward=reward, done=done, metrics=metrics)
 
