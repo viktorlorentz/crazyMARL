@@ -48,7 +48,7 @@ class MultiQuadEnv(PipelineEnv):
             self.target_position = self.trajectory[0]
         self.ids = get_body_and_joint_ids(sys, num_quads=self.num_quads)
 
-        self.alpha = jp.exp(-self.dt / cfg.motor_tau)
+        
 
 
     def reset(self, rng: jax.Array) -> State:
@@ -101,6 +101,9 @@ class MultiQuadEnv(PipelineEnv):
             ]))
         quats = jp.stack(quats)
 
+        tau = cfg.motor_tau * (1 + jp.clip(jax.random.normal(rng, (1,), minval=-0.1, maxval=0.1), -0.1, 0.1), -1.0, 1.0)
+        motor_alpha = jp.exp(-self.dt / tau)
+
         qpos = base_qpos
         if cfg.payload:
             qpos = qpos.at[self.ids["payload_qpos_start"]:self.ids["payload_qpos_start"]+3].set(payload_pos)
@@ -114,8 +117,11 @@ class MultiQuadEnv(PipelineEnv):
         obs = build_obs(ps, last_act, self.target_position, cfg.obs_noise, nk, self.ids, payload=cfg.payload)
         return State(ps, obs, jp.array(0.0), jp.array(0.0), 
                      {'time': ps.time,
-                      'reward': 0.0, 'max_thrust': max_thrust,
-                      'last_filtered_action': last_act})
+                      'reward': 0.0, 
+                      'max_thrust': max_thrust,
+                      'last_filtered_action': last_act,
+                      'motor_alpha': motor_alpha
+                        })
 
     def step(self, state: State, action: jax.Array) -> State:
         cfg = self.cfg
@@ -127,9 +133,11 @@ class MultiQuadEnv(PipelineEnv):
         thrust_cmds = jp.clip(thrust_cmds, 0.0, 1.0)
         action_scaled = thrust_cmds * max_thrust
 
+
+        alpha = state.metrics['motor_alpha']
         filtered_action = (
-            self.alpha * state.metrics['last_filtered_action']
-            + (1 - self.alpha) * action_scaled
+            alpha * state.metrics['last_filtered_action']
+            + (1 - alpha) * action_scaled
         )
 
         ps = self.pipeline_step(state.pipeline_state, filtered_action)
@@ -230,6 +238,7 @@ class MultiQuadEnv(PipelineEnv):
         'reward': reward,
         'max_thrust': state.metrics['max_thrust'],
         'last_filtered_action': filtered_action,
+        'motor_alpha': state.metrics['motor_alpha'],
         }
         return state.replace(pipeline_state=ps, obs=obs, reward=reward, done=done, metrics=metrics)
 
