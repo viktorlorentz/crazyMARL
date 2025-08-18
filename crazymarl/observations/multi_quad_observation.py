@@ -61,23 +61,23 @@ def build_obs(
     clipped_actions = last_action.reshape((num_quads, 4))
     clipped_actions = jnp.clip(clipped_actions, -1.0, 1.0)            # (Q,4)
 
-    # stack each quad’s obs: [rel_pos, rot9, lin3, ang3, act4] -> (Q,22)
-    per_quad = jnp.concatenate(
-        [rel_pos, rots_flat, linvels, angvels, clipped_actions], axis=1
-    )
-
-    # flatten payload + quads
-    flat_quads = per_quad.reshape(-1)                                 # (Q*22,)
-
     if not payload:
         payload_error = target_position - quad_pos[0, :]  # use first quad pos as target for now
         payload_linvel = linvels[0, :]  # use first quad linvel as target for now
 
         rel_pos = jnp.zeros_like(rel_pos)  # zero rel pos if no payload
-        linvels = jnp.zeros_like(payload_linvel)  # zero linvels if no payload
+        linvels = jnp.zeros_like(linvels)  # zero linvels if no payload
 
 
     base_obs = jnp.concatenate([payload_error, payload_linvel], axis=0)  # (6,)
+
+     # stack each quad’s obs: [rel_pos, rot9, lin3, ang3, act4] -> (Q,22)
+    per_quad = jnp.concatenate(
+        [rel_pos, rots_flat, linvels, angvels, clipped_actions], axis=1
+    )
+
+    # flatten payload + quads
+    flat_quads = per_quad.reshape(-1)   
 
     obs = jnp.concatenate([base_obs, flat_quads], axis=0) # (6 + Q*22,)
 
