@@ -84,12 +84,12 @@ def build_obs(
     # --- optional noise ---
     def add_noise(o):
         # build a lookup scale vector once
-        payload_scale = jnp.concatenate([jnp.ones(3)*0.005, jnp.ones(3)*0.05])
+        payload_scale = jnp.concatenate([jnp.ones(3)*0.002, jnp.ones(3)*0.002])
         per_quad_scale = jnp.concatenate([
-            jnp.ones(3)*0.02,  # rel pos
-            jnp.ones(9)*0.01, # rot
-            jnp.ones(3)*0.05,  # linvel
-            jnp.ones(3)*0.1,  # angvel
+            jnp.ones(3)*0.002,  # rel pos
+            jnp.ones(9)*0.002, # rot
+            jnp.ones(3)*0.004,  # linvel
+            jnp.ones(3)*0.004,  # angvel
             jnp.ones(4)*0.0   # actions
         ])  # (22,)
         noise_per_quad = jnp.tile(per_quad_scale, (num_quads,))  # (Q*22,)

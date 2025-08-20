@@ -199,7 +199,7 @@ class QuadEnvGenerator:
             })
             ET.SubElement(cf2, "inertial", {
                 "pos": "0 0 0", "mass": "0.034",
-                "diaginertia": "1.65717e-05 1.66556e-05 2.92617e-05"
+                "diaginertia": "3.85e-06 3.85e-06 5.9675e-06"
             })
             # visual & collision
             visual_mats = [

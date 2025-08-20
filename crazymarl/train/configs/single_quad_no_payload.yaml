@@ -1,12 +1,12 @@
 training:
   ENV_KWARGS:
-    max_thrust_range: 0.15
+    max_thrust_range: 0.0
     num_quads: 1
     cable_length: 0.3
     payload_mass: 0.01
     payload: false  # Set to False for no payload
-    obs_noise: 0.2
-    act_noise: 0.1
+    obs_noise: 1.0
+    act_noise: 0.0
     reward_coeffs:
       distance_reward_coef: 1.0
       velocity_reward_coef: 1.0
@@ -20,7 +20,7 @@ training:
       out_of_bounds_penalty_coef: -10.0
       smooth_action_coef: -50.0
       action_energy_coef: -1.0
-  TOTAL_TIMESTEPS: 1500000000
+  TOTAL_TIMESTEPS: 2000000000
   NUM_ENVS: 16384
   NUM_STEPS: 64
   
