@@ -50,8 +50,11 @@ class MultiQuadEnv(PipelineEnv):
 
         # External disturbance configuration
         self.disturbance_interval_s = 3.0  # average one event every 2 seconds
-        self.disturbance_force_range = (0.0, 0.15)    # Newtons
+        self.disturbance_force_range = (0.0, 0.1)    # Newtons
         self.disturbance_torque_range = (0.0, 3e-5)   # N·m
+        # Bias torque toward yaw (body z-axis in world frame)
+        self.torque_yaw_bias_kappa = 6.0   # larger => stronger alignment with yaw axis
+        self.torque_yaw_noise_std = 1.0    # noise around yaw axis
 
         
 
@@ -81,9 +84,18 @@ class MultiQuadEnv(PipelineEnv):
         )
         force_w = f_dir * f_mag
 
-        # Random torque direction and magnitude
-        t_dir_raw = jax.random.normal(k_tdir, (3,))
+        # Random torque direction and magnitude (biased toward quad's yaw axis)
+        # Compute body z-axis (yaw axis) in world frame for the selected quad
+        quats = ps_in.xquat[quad_body_ids]            # (num_quads, 4)
+        R = R_from_quat(quats)                        # (num_quads, 3, 3)
+        body_z_axes = R[:, :, 2]                      # (num_quads, 3)
+        body_z_dir = body_z_axes[body_idx]            # (3,)
+
+        # Sample a noisy, biased direction toward body z-axis
+        t_noise = jax.random.normal(k_tdir, (3,)) * self.torque_yaw_noise_std
+        t_dir_raw = self.torque_yaw_bias_kappa * body_z_dir + t_noise
         t_dir = t_dir_raw / (jp.linalg.norm(t_dir_raw) + 1e-6)
+
         t_mag = jax.random.uniform(
             k_tmag, (), minval=self.disturbance_torque_range[0], maxval=self.disturbance_torque_range[1]
         )
@@ -226,12 +238,12 @@ class MultiQuadEnv(PipelineEnv):
         collision       = jp.logical_or(quad_collision, ground_collision)
 
         # out-of-bounds if any quad tilts too far or goes under payload
-        too_tilted = jp.any(jp.abs(angles) > jp.radians(150))
+        too_tilted = jp.any(jp.abs(angles) > jp.radians(170))
         if cfg.payload:
             below_pl   = jp.any(qp[:, 2] < ps.xpos[self.ids["payload_body_id"]][2] - 0.15)
             out_of_bounds = jp.logical_or(too_tilted, below_pl)
         else:
-            out_of_bounds = too_tilted
+            out_of_bounds = False
 
         # out of bounds for pos error shrinking with time
         # payload_pos = ps.xpos[self.payload_body_id]
