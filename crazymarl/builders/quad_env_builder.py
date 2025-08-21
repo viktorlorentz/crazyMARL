@@ -250,7 +250,7 @@ class QuadEnvGenerator:
         act = ET.SubElement(mj, "actuator")
         for i in range(self.n):
             for lbl in ("1","2","3","4"):
-                gear = 0.006 if int(lbl) % 2 else -0.006
+                gear = -0.006 if int(lbl) % 2 else 0.006 #inverted
                 ET.SubElement(act, "general", {
                     "name": f"q{i}_thrust{lbl}",
                     "class": "cf2",

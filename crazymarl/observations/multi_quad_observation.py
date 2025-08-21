@@ -58,7 +58,7 @@ def build_obs(
     angvels = vmap(lambda d: lax.dynamic_slice(gyro, (d,), (3,)))(qds)
     
     # zero angvels
-    angvels = jnp.zeros_like(angvels)
+    #angvels = jnp.zeros_like(angvels)
 
     # last action, clipped
     clipped_actions = last_action.reshape((num_quads, 4))
