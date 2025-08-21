@@ -20,7 +20,7 @@ training:
       out_of_bounds_penalty_coef: -10.0
       smooth_action_coef: -1.0
       action_energy_coef: -10.0
-  TOTAL_TIMESTEPS: 1000000000
+  TOTAL_TIMESTEPS: 750000000
   NUM_ENVS: 16384
   NUM_STEPS: 64
   
