@@ -52,9 +52,10 @@ def build_obs(
     from jax import lax
     qds = jnp.array(ids["quad_dofadr"], dtype=int)  # (Q,)
     linvels = vmap(lambda d: lax.dynamic_slice(data.qvel, (d,), (3,)))(qds)
-    angvels = vmap(lambda d: lax.dynamic_slice(data.qvel, (d + 3,), (3,)))(qds)
 
-    
+    # extract ang vel from gyro sensor
+    gyro = data.sensordata
+    angvels = vmap(lambda d: lax.dynamic_slice(gyro, (d,), (3,)))(qds)
     
 
     # last action, clipped

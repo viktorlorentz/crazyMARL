@@ -259,6 +259,14 @@ class QuadEnvGenerator:
                     "gear": f"0 0 1 0 0 {gear:.0e}"
                 })
 
+        # gyros
+        sen = ET.SubElement(mj, "sensor")
+        for i in range(self.n):
+            ET.SubElement(sen, "gyro", {
+                "name": f"q{i}_gyro",
+                "site": f"q{i}_imu",
+            })
+
         # visualize goal as a semi-transparent green sphere
         ET.SubElement(wb, "site", {
             "name": "goal_marker",
