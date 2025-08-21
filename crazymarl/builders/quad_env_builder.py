@@ -199,7 +199,7 @@ class QuadEnvGenerator:
             })
             ET.SubElement(cf2, "inertial", {
                 "pos": "0 0 0", "mass": "0.034",
-                "diaginertia": "3.85e-06 3.85e-06 5.9675e-06"
+                "diaginertia": "1.65717e-05 1.66556e-05 2.92617e-05"
             })
             # visual & collision
             visual_mats = [
@@ -255,7 +255,7 @@ class QuadEnvGenerator:
                     "name": f"q{i}_thrust{lbl}",
                     "class": "cf2",
                     "site": f"q{i}_thrust{lbl}",
-                    "ctrlrange": "0 0.14",
+                    "ctrlrange": "0 0.118",
                     "gear": f"0 0 1 0 0 {gear:.0e}"
                 })
 

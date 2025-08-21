@@ -27,7 +27,7 @@ class MultiQuadEnv(PipelineEnv):
         self.cfg = cfg
         self.num_quads = cfg.num_quads
         self.time_per_action = 1.0 / cfg.policy_freq
-        self.base_max_thrust = 0.14
+        self.base_max_thrust =  0.118
         self.goal_center = jp.array([0.0, 0.0, 1.5])
         self.target_position = self.goal_center
         self.trajectory = None

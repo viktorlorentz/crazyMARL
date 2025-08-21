@@ -1,6 +1,6 @@
 training:
   ENV_KWARGS:
-    max_thrust_range: 0.0
+    max_thrust_range: 0.2
     num_quads: 1
     cable_length: 0.3
     payload_mass: 0.01
