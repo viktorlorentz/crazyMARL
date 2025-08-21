@@ -101,7 +101,7 @@ class MultiQuadEnv(PipelineEnv):
         quats = jp.stack(quats)
 
         tau = cfg.motor_tau 
-        motor_alpha = jp.exp(-self.dt / tau)
+        motor_alpha = self.dt / tau
 
         qpos = base_qpos
         if cfg.payload:
@@ -118,7 +118,7 @@ class MultiQuadEnv(PipelineEnv):
                      {'time': ps.time,
                       'reward': 0.0, 
                       'max_thrust': max_thrust,
-                      'last_filtered_action': last_act,
+                      'filtered_rpm_proxy': last_act,
                       'motor_alpha': motor_alpha
                         })
 
@@ -134,12 +134,14 @@ class MultiQuadEnv(PipelineEnv):
 
 
         alpha = state.metrics['motor_alpha']
-        filtered_action = (
-            alpha * state.metrics['last_filtered_action']
-            + (1 - alpha) * action_scaled
-        )
+        rpm_proxy = jp.sqrt(action_scaled)  # we use sqrt of thrust as a proxy for rotor speed
+        r_prev = state.metrics['filtered_rpm_proxy']
+        
+        filtered_rpm_proxy = r_prev + alpha * (rpm_proxy - r_prev)
 
-        ps = self.pipeline_step(state.pipeline_state, filtered_action)
+        filtered_thrust = jp.square(filtered_rpm_proxy)  # convert back to thrust
+
+        ps = self.pipeline_step(state.pipeline_state, filtered_thrust)
 
 
         # Generate a dynamic noise_key using pipeline_state fields.
@@ -236,7 +238,7 @@ class MultiQuadEnv(PipelineEnv):
         'time': ps.time,
         'reward': reward,
         'max_thrust': state.metrics['max_thrust'],
-        'last_filtered_action': filtered_action,
+        'filtered_rpm_proxy': filtered_rpm_proxy,
         'motor_alpha': state.metrics['motor_alpha'],
         }
         return state.replace(pipeline_state=ps, obs=obs, reward=reward, done=done, metrics=metrics)
