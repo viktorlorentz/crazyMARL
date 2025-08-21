@@ -50,7 +50,7 @@ class MultiQuadEnv(PipelineEnv):
 
         # External disturbance configuration
         self.disturbance_interval_s = 3.0  # average one event every 2 seconds
-        self.disturbance_force_range = (0.0, 0.1)    # Newtons
+        self.disturbance_force_range = (0.0, 0.01)    # Newtons
         self.disturbance_torque_range = (0.0, 3e-5)   # N·m
         # Bias torque toward yaw (body z-axis in world frame)
         self.torque_yaw_bias_kappa = 6.0   # larger => stronger alignment with yaw axis
