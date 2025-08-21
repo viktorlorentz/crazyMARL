@@ -48,8 +48,52 @@ class MultiQuadEnv(PipelineEnv):
             self.target_position = self.trajectory[0]
         self.ids = get_body_and_joint_ids(sys, num_quads=self.num_quads)
 
+        # External disturbance configuration
+        self.disturbance_interval_s = 3.0  # average one event every 2 seconds
+        self.disturbance_force_range = (0.0, 0.15)    # Newtons
+        self.disturbance_torque_range = (0.0, 3e-5)   # N·m
+
         
 
+
+    def _build_disturbance_xfrc(self, ps_in):
+        # Deterministic RNG from current physics state (stateless sampling)
+        dk = jax.random.PRNGKey(12345)
+        dk = jax.random.fold_in(dk, jp.int32(ps_in.time * 1e6))
+        dk = jax.random.fold_in(dk, jp.int32(jp.sum(ps_in.xpos) * 1e3))
+        dk = jax.random.fold_in(dk, jp.int32(jp.sum(ps_in.cvel) * 1e3))
+        dk, k_evt, k_body, k_fdir, k_fmag, k_tdir, k_tmag = jax.random.split(dk, 7)
+
+        # Event probability => expected one every disturbance_interval_s seconds
+        p_event = jp.clip(self.time_per_action / self.disturbance_interval_s, 0.0, 1.0)
+        event = jax.random.bernoulli(k_evt, p=p_event)
+        event_f = event.astype(jp.float32)
+
+        quad_body_ids = jp.array(self.ids["quad_body_ids"])
+        body_idx = jax.random.randint(k_body, (), 0, quad_body_ids.shape[0])
+        body_id = quad_body_ids[body_idx]
+
+        # Random force direction and magnitude
+        f_dir_raw = jax.random.normal(k_fdir, (3,))
+        f_dir = f_dir_raw / (jp.linalg.norm(f_dir_raw) + 1e-6)
+        f_mag = jax.random.uniform(
+            k_fmag, (), minval=self.disturbance_force_range[0], maxval=self.disturbance_force_range[1]
+        )
+        force_w = f_dir * f_mag
+
+        # Random torque direction and magnitude
+        t_dir_raw = jax.random.normal(k_tdir, (3,))
+        t_dir = t_dir_raw / (jp.linalg.norm(t_dir_raw) + 1e-6)
+        t_mag = jax.random.uniform(
+            k_tmag, (), minval=self.disturbance_torque_range[0], maxval=self.disturbance_torque_range[1]
+        )
+        torque_w = t_dir * t_mag
+
+        # Build xfrc_applied for a single step (world frame: [fx,fy,fz, tx,ty,tz])
+        xfrc_step = jp.zeros_like(ps_in.xfrc_applied)
+        xfrc_vec = jp.concatenate([force_w, torque_w]) * event_f
+        xfrc_step = xfrc_step.at[body_id].set(xfrc_vec)
+        return xfrc_step
 
     def reset(self, rng: jax.Array) -> State:
         cfg = self.cfg
@@ -136,12 +180,15 @@ class MultiQuadEnv(PipelineEnv):
         alpha = state.metrics['motor_alpha']
         rpm_proxy = jp.sqrt(action_scaled)  # we use sqrt of thrust as a proxy for rotor speed
         r_prev = state.metrics['filtered_rpm_proxy']
-        
         filtered_rpm_proxy = r_prev + alpha * (rpm_proxy - r_prev)
-
         filtered_thrust = jp.square(filtered_rpm_proxy)  # convert back to thrust
 
-        ps = self.pipeline_step(state.pipeline_state, filtered_thrust)
+        # Build disturbance xfrc for this step
+        ps_in = state.pipeline_state
+        xfrc_step = self._build_disturbance_xfrc(ps_in)
+
+        # Step physics with disturbance
+        ps = self.pipeline_step(ps_in.replace(xfrc_applied=xfrc_step), filtered_thrust)
 
 
         # Generate a dynamic noise_key using pipeline_state fields.
@@ -150,13 +197,12 @@ class MultiQuadEnv(PipelineEnv):
         noise_key = jax.random.fold_in(noise_key, jp.int32(jp.sum(ps.xpos) * 1e3))
         noise_key = jax.random.fold_in(noise_key, jp.int32(jp.sum(ps.cvel) * 1e3))
 
-        # Add actuator noise.
+        # Add actuator noise (action noise; applied to scaled action but not re-stepped here)
         if cfg.act_noise:
             noise = jax.random.normal(noise_key, shape=action_scaled.shape)
             action_scaled = action_scaled + cfg.act_noise * max_thrust * noise
 
         quad_body_ids = jp.array(self.ids["quad_body_ids"])
-
         up = jp.array([0.0, 0.0, 1.0])
         # collect orientations & positions
         quats = ps.xquat[quad_body_ids]  # (num_quads, 4)
@@ -235,11 +281,11 @@ class MultiQuadEnv(PipelineEnv):
         done = done * 1.0
 
         metrics = {
-        'time': ps.time,
-        'reward': reward,
-        'max_thrust': state.metrics['max_thrust'],
-        'filtered_rpm_proxy': filtered_rpm_proxy,
-        'motor_alpha': state.metrics['motor_alpha'],
+            'time': ps.time,
+            'reward': reward,
+            'max_thrust': state.metrics['max_thrust'],
+            'filtered_rpm_proxy': filtered_rpm_proxy,
+            'motor_alpha': state.metrics['motor_alpha'],
         }
         return state.replace(pipeline_state=ps, obs=obs, reward=reward, done=done, metrics=metrics)
 

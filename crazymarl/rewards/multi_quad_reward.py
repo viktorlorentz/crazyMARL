@@ -75,6 +75,12 @@ def calc_reward(
     yaw_vels = angvels[:, 2] # only yaw velocity matters
     ang_vel_reward      = jp.mean(er(yaw_vels)-0.1*yaw_vels**2) # penalize high yaw velocities, reward low ones
 
+
+    hx, hy = rots[:, 0, 0], rots[:, 1, 0]
+    cos_err = hx / jp.maximum(1e-6, jp.sqrt(hx*hx + hy*hy))
+    yaw_reward = jp.mean(cos_err)  
+    ang_vel_reward += yaw_reward
+
     # This function computes the velocity reward based on the distance, current and maximum velocities. 
     # Close to the target it only alows low velocity and further in allows up to max_vel
     vel_reward_function = lambda vel, max_vel: jp.exp(-((vel / (jp.minimum(3 * dis, 1) + 0.02)) / max_vel) ** 8)
