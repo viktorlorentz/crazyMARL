@@ -64,6 +64,9 @@ def build_obs(
     clipped_actions = last_action.reshape((num_quads, 4))
     clipped_actions = jnp.clip(clipped_actions, -1.0, 1.0)            # (Q,4)
 
+    #zero actions
+    clipped_actions = jnp.zeros_like(clipped_actions)  # zero actions if no payload
+
     if not payload:
         payload_error = target_position - quad_pos[0, :]  # use first quad pos as target for now
         payload_linvel = linvels[0, :]  # use first quad linvel as target for now
