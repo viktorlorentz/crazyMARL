@@ -296,6 +296,9 @@ def make_brax_system(
         payload=payload
     )
     xml = gen.generate_xml()
+    # with open("quad_env_with_camera.xml", "w") as f:
+    #     f.write(xml)
+    # print("Written quad_env_with_camera.xml")
     mj_model = mujoco.MjModel.from_xml_string(xml)
     sys = mjcf.load_model(mj_model)
 

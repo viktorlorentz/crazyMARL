@@ -14,7 +14,7 @@ class MultiQuadConfig:
     act_noise: float = 0.0
 
     # Quadrotor parameters
-    max_thrust_range: float = 0.3
+    max_thrust_range: float = 0.2
     num_quads: int = 2
     payload: bool = True
     cable_length: float = 0.4
@@ -25,7 +25,7 @@ class MultiQuadConfig:
     trajectory: Optional[Any] = None
 
     # Motor parameters
-    motor_tau =  0.2/4 # 0.15/4   # motor time constant (s) is T/4
+    motor_tau =  0.15/4   # motor time constant (s) is T/4
 
     # Reward coefficients
     reward_coeffs: Dict[str, float] = field(default_factory=lambda: {
