@@ -110,10 +110,9 @@ class MultiQuadEnv(PipelineEnv):
     def reset(self, rng: jax.Array) -> State:
         cfg = self.cfg
         rng, mt_rng = jax.random.split(rng)
-        motor_offsets = cfg.max_thrust_range * (1 + jax.random.normal(mt_rng, (self.sys.nu,)))
-        max_thrust = self.base_max_thrust * (1 - motor_offsets)
-        # clip max thrust to avoid exceeding motor limits
-        max_thrust = jp.clip(max_thrust,self.base_max_thrust * (1 - cfg.max_thrust_range), self.base_max_thrust)
+        motor_offsets = 0.05 * cfg.max_thrust_range * ( jax.random.normal(mt_rng, (self.sys.nu,)))
+        max_thrust = self.base_max_thrust * jax.random.uniform(mt_rng, minval=1.0-cfg.max_thrust_range, maxval=1.0)
+        max_thrust += motor_offsets
 
         rng, r1, r2, rc = jax.random.split(rng, 4)
         base_qpos = self.sys.qpos0
@@ -229,7 +228,7 @@ class MultiQuadEnv(PipelineEnv):
         quad_collision = min_dist < 0.15
 
         # ground collision if any quads AND payload near ground
-        ground_collision_quad    = jp.any(qp[:, 2] < 0.03)
+        ground_collision_quad    = jp.any(qp[:, 2] < 0.05)
         if cfg.payload:
             ground_collision_payload = ps.xpos[self.ids["payload_body_id"]][2] < 0.03
             ground_collision = jp.logical_or(ground_collision_quad, ground_collision_payload)
