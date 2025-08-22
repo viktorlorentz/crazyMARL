@@ -14,7 +14,7 @@ class MultiQuadConfig:
     act_noise: float = 0.0
 
     # Quadrotor parameters
-    max_thrust_range: float = 0.2
+    max_thrust_range: float = 0.3
     num_quads: int = 2
     payload: bool = True
     cable_length: float = 0.4
