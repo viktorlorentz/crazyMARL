@@ -160,8 +160,6 @@ class MultiQuadEnv(PipelineEnv):
         tau = cfg.motor_tau * jp.clip(1 + jax.random.normal(rng, ()) * 0.5, 0.1, 1.5)
         motor_alpha = self.dt / tau
 
-        jax.debug.print("tau: {}", tau)
-
         qpos = base_qpos
         if cfg.payload:
             qpos = qpos.at[self.ids["payload_qpos_start"]:self.ids["payload_qpos_start"]+3].set(payload_pos)
