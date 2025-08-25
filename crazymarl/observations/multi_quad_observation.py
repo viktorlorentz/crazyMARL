@@ -98,7 +98,7 @@ def build_obs(
         ])  # (22,)
         noise_per_quad = jnp.tile(per_quad_scale, (num_quads,))  # (Q*22,)
         lookup = jnp.concatenate([payload_scale, noise_per_quad], axis=0)  # match obs length
-        n = jax.random.normal(add_noise_key, o.shape)
+        n = jax.random.normal(noise_key, o.shape)
         return o + obs_noise * lookup * n
 
     obs = lax.cond(obs_noise > 0.0, add_noise, lambda o: o, obs)

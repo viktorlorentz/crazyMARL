@@ -38,7 +38,7 @@ class MultiQuadEnv(PipelineEnv):
         self.cfg = cfg
        
         self.time_per_action = 1.0 / cfg.policy_freq
-        self.base_max_thrust = 0.118
+        self.base_max_thrust = 0.12
         self.goal_center = jp.array([0.0, 0.0, 1.5])
         self.target_position = self.goal_center
         self.trajectory = None
@@ -114,7 +114,7 @@ class MultiQuadEnv(PipelineEnv):
         max_thrust = self.base_max_thrust * jax.random.uniform(mt_rng, minval=1.0-cfg.max_thrust_range, maxval=1.0)
         max_thrust += motor_offsets
 
-        max_thrust = jp.clip(max_thrust, 0.09, 0.13) 
+        max_thrust = jp.clip(max_thrust, 0.095, 0.14) 
 
         rng, r1, r2, rc = jax.random.split(rng, 4)
         base_qpos = self.sys.qpos0
@@ -157,8 +157,10 @@ class MultiQuadEnv(PipelineEnv):
             ]))
         quats = jp.stack(quats)
 
-        tau = cfg.motor_tau 
+        tau = cfg.motor_tau * jp.clip(1 + jax.random.normal(rng, ()) * 0.5, 0.1, 1.5)
         motor_alpha = self.dt / tau
+
+        jax.debug.print("tau: {}", tau)
 
         qpos = base_qpos
         if cfg.payload:
