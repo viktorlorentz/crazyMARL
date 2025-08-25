@@ -77,7 +77,7 @@ class QuadEnvGenerator:
             "angle": "radian", "meshdir": self.mesh_dir, "discardvisual": "false"
         })
         opt = ET.SubElement(mj, "option", {
-            "timestep": self.dt,
+            "timestep": f"{self.dt}",
             "gravity": "0 0 -9.81",
             "solver": "Newton",
             "jacobian": "dense",
