@@ -34,6 +34,7 @@ class QuadEnvGenerator:
         camera_quat: str = "0.601501 0.371748 -0.371748 -0.601501",
         camera_mode: str = "trackcom",
         payload: bool = True,
+        dt: float = 0.004,
     ):
         self.n = n_quads
         self.cable_length = cable_length
@@ -52,7 +53,8 @@ class QuadEnvGenerator:
         self.camera_pos = camera_pos
         self.camera_quat = camera_quat
         self.camera_mode = camera_mode
-
+        self.dt = dt
+   
         # Print out all the Environment parameters
         print(f"Generating XML for {self.n} quadrotors with payload:")
         print(f"  Cable Length: {self.cable_length} m")
@@ -75,11 +77,11 @@ class QuadEnvGenerator:
             "angle": "radian", "meshdir": self.mesh_dir, "discardvisual": "false"
         })
         opt = ET.SubElement(mj, "option", {
-            "timestep": "0.004",
+            "timestep": self.dt,
             "gravity": "0 0 -9.81",
             "solver": "Newton",
             "jacobian": "dense",
-            "iterations": "1",
+            "iterations": "2",
             "ls_iterations": "2",
             "integrator": "Euler",
         })
@@ -293,7 +295,8 @@ def make_brax_system(
         n_quads=num_quads,
         cable_length=cable_length,
         payload_mass=payload_mass,
-        payload=payload
+        payload=payload,
+        dt=(1.0 / policy_freq) / sim_steps_per_action
     )
     xml = gen.generate_xml()
     # with open("quad_env_with_camera.xml", "w") as f:
@@ -302,9 +305,8 @@ def make_brax_system(
     mj_model = mujoco.MjModel.from_xml_string(xml)
     sys = mjcf.load_model(mj_model)
 
-    # set timestep
-    dt = (1.0 / policy_freq) / sim_steps_per_action
-    sys.mj_model.opt.timestep = dt
+   
+    # sys.mj_model.opt.timestep = gen.dt
     return sys
 
 def get_body_and_joint_ids(sys, num_quads):
