@@ -81,7 +81,7 @@ class QuadEnvGenerator:
             "gravity": "0 0 -9.81",
             "solver": "Newton",
             "jacobian": "dense",
-            "iterations": "2",
+            "iterations": "1",
             "ls_iterations": "2",
             "integrator": "Euler",
         })
