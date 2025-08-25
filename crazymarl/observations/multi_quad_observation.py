@@ -43,8 +43,33 @@ def build_obs(
 
     # rotations
     quats = data.xquat[quad_ids]                                      # (Q,4)
-    rots = vmap(R_from_quat)(quats)                                   # (Q,3,3)
-    rots_flat = rots.reshape(num_quads, -1)                           # (Q,9)
+
+    # split key: one for orientation noise, one for additive obs noise later
+    rot_key, add_noise_key = jax.random.split(noise_key)
+
+    sigma_rad = jnp.deg2rad(4.0)
+    # axis-angle vector samples (Q,3)
+    delta = jax.random.normal(rot_key, (num_quads, 3)) * sigma_rad
+    angles = jnp.linalg.norm(delta, axis=1, keepdims=True)
+    axes = delta / jnp.maximum(angles, 1e-12)
+
+    half = 0.5 * angles
+    sin_half = jnp.sin(half)
+    noise_quat = jnp.concatenate([jnp.cos(half), axes * sin_half], axis=1)  # (Q,4)
+
+    def quat_mul(q1, q2):
+        w1, x1, y1, z1 = jnp.split(q1, 4, axis=-1)
+        w2, x2, y2, z2 = jnp.split(q2, 4, axis=-1)
+        return jnp.concatenate([
+            w1*w2 - x1*x2 - y1*y2 - z1*z2,
+            w1*x2 + x1*w2 + y1*z2 - z1*y2,
+            w1*y2 - x1*z2 + y1*w2 + z1*x2,
+            w1*z2 + x1*y2 - y1*x2 + z1*w2
+        ], axis=-1)
+
+    noisy_quats = quat_mul(noise_quat, quats)  # apply noise (left-multiply)
+    rots = vmap(R_from_quat)(noisy_quats)                                   # (Q,3,3)
+    rots_flat = rots.reshape(num_quads, -1)                                 # (Q,9)
 
     # velocities
    
@@ -98,7 +123,7 @@ def build_obs(
         ])  # (22,)
         noise_per_quad = jnp.tile(per_quad_scale, (num_quads,))  # (Q*22,)
         lookup = jnp.concatenate([payload_scale, noise_per_quad], axis=0)  # match obs length
-        n = jax.random.normal(noise_key, o.shape)
+        n = jax.random.normal(add_noise_key, o.shape)
         return o + obs_noise * lookup * n
 
     obs = lax.cond(obs_noise > 0.0, add_noise, lambda o: o, obs)
