@@ -22,7 +22,8 @@ def build_obs(
         payload_pos = data.xpos[ids["payload_body_id"]]                   # (3,)
         # use payload_dofadr instead of body_id
         pd = ids["payload_dofadr"]
-        payload_linvel = data.qvel[pd : pd + 3]            # (3,)
+        # Use dynamic_slice instead of Python slice to avoid JIT dynamic slice error:
+        payload_linvel = lax.dynamic_slice(data.qvel, (jnp.asarray(pd),), (3,))  # (3,)
         err = target_position - payload_pos                              # (3,)
         dist = jnp.linalg.norm(err)
         payload_error = err / jnp.maximum(dist, 1.0)                      # (3,)
