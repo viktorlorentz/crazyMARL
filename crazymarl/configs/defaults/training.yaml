@@ -16,7 +16,7 @@ training:
       action_energy_coef: -1.0
     obs_noise: 1.0
     act_noise: 0.0
-    max_thrust_range: 0.1
+    max_thrust_range: 0.15
     num_quads: 2
     episode_length: 2048
     cable_length: 0.4
