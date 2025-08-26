@@ -48,9 +48,6 @@ def build_obs(
     rots_flat = rots.reshape(num_quads, -1)                           # (Q,9)
 
     # velocities
-   
-
-    from jax import lax
     qds = jnp.array(ids["quad_dofadr"], dtype=int)  # (Q,)
     linvels = vmap(lambda d: lax.dynamic_slice(data.qvel, (d,), (3,)))(qds)
 
