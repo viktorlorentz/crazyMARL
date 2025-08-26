@@ -83,7 +83,7 @@ def calc_reward(
 
     # This function computes the velocity reward based on the distance, current and maximum velocities. 
     # Close to the target it only alows low velocity and further in allows up to max_vel
-    vel_reward_function = lambda vel, max_vel: 1 - (vel /  max_vel * jp.minimum(3 * dis+0.05, 1)) ** 4
+    vel_reward_function = lambda vel, max_vel: 1 - (vel /  (max_vel * jp.minimum(3 * dis+0.05, 1))) ** 4
 
     linvel_quad_reward  = jp.mean(vel_reward_function(jp.linalg.norm(linvels, axis=-1), 1.5)) #quad max 2m/s
     payload_velocity_reward = vel_reward_function(jp.linalg.norm(payload_linlv), 1.0) #payload max 1.5m/s
