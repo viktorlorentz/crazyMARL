@@ -80,7 +80,7 @@ def load_model(model_path: str) -> tf.lite.Interpreter:
     return interpreter
 
 #------------------------------------------------------------------------------
-def run_batched_rollout(interpreter: tf.lite.Interpreter, env, num_envs: int, env_config: dict):
+def run_batched_rollout(interpreter: tf.lite.Interpreter, env, num_envs: int, env_config: dict, seed: int = SEED):
     ids = env.env.ids # get mjx ids for the environment
     
     print(f"ENV IDS: {env.env.ids}")
@@ -99,7 +99,7 @@ def run_batched_rollout(interpreter: tf.lite.Interpreter, env, num_envs: int, en
     out_idx = interpreter.get_output_details()[0]["index"]
 
     # Batch reset to get initial states
-    rng = jax.random.PRNGKey(SEED)
+    rng = jax.random.PRNGKey(seed)
     keys = jax.random.split(rng, num_envs)
     obs_batched, state = jax.vmap(env.reset)(keys)
 
