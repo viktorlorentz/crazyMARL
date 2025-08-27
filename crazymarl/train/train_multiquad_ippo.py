@@ -80,7 +80,7 @@ def eval_results(eval_env, jit_reset, jit_inference_fn, jit_step):
     # --------------------
     # Simulation
     # --------------------
-    n_steps = 2500
+    n_steps = 5000
     render_every = 2
     rng = jax.random.PRNGKey(0)
     state = jit_reset(rng)
