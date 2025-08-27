@@ -201,10 +201,11 @@ class MultiQuadEnv(PipelineEnv):
 
         # Build disturbance xfrc for this step
         ps_in = state.pipeline_state
-        xfrc_step = self._build_disturbance_xfrc(ps_in)
+        #xfrc_step = self._build_disturbance_xfrc(ps_in)
+        #ps_in = ps_in.replace(xfrc_applied=xfrc_step)
 
         # Step physics with disturbance
-        ps = self.pipeline_step(ps_in.replace(xfrc_applied=xfrc_step), filtered_thrust)
+        ps = self.pipeline_step(ps_in, filtered_thrust)
 
 
         # Generate a dynamic noise_key using pipeline_state fields.
