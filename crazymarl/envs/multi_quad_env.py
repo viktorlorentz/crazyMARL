@@ -111,7 +111,7 @@ class MultiQuadEnv(PipelineEnv):
         cfg = self.cfg
         rng, mt_rng = jax.random.split(rng)
         motor_offsets = 0.05 * cfg.max_thrust_range * ( jax.random.normal(mt_rng, (self.sys.nu,)))
-        max_thrust = jax.random.uniform(mt_rng, minval=0.105, maxval=0.13)
+        max_thrust = jax.random.uniform(mt_rng, minval=0.11, maxval=0.13)
         max_thrust += motor_offsets
 
         max_thrust = jp.clip(max_thrust, 0.105, 0.14) 
@@ -168,9 +168,9 @@ class MultiQuadEnv(PipelineEnv):
             qpos = qpos.at[s+3:s+7].set(quats[i])
 
         ps = self.pipeline_init(qpos, qvel)
-        last_act = jax.random.uniform(rng, shape=(self.sys.nu,), minval=-1.0, maxval=1.0)
+        last_act = -jp.ones((self.sys.nu,))
 
-        last_filtered_rpm_proxy = jp.sqrt((last_act*0.5+0.5)*max_thrust) + jax.random.normal(rng, shape=(self.sys.nu,)) * 0.01
+        last_filtered_rpm_proxy = jp.zeros((self.sys.nu,))
 
         rng, nk = jax.random.split(rng)
         obs = build_obs(ps, last_act, self.target_position, cfg.obs_noise, nk, self.ids, payload=cfg.payload)
