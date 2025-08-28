@@ -157,9 +157,7 @@ class MultiQuadEnv(PipelineEnv):
             ]))
         quats = jp.stack(quats)
 
-        tau = cfg.motor_tau #* jp.clip(1 + jax.random.normal(rng, ()) * 0.2, 0.3, 1.3)
-       # tau = jp.clip(cfg.motor_tau * jax.random.uniform(rng, (), minval=0.0, maxval=1.3), 2*self.dt, 1)
-
+        tau = cfg.motor_tau * jp.clip(1 + jax.random.normal(rng, ()) * 0.3, 0.1, 1.5)
 
         motor_alpha = self.dt / tau
 
@@ -173,7 +171,7 @@ class MultiQuadEnv(PipelineEnv):
         ps = self.pipeline_init(qpos, qvel)
         last_act = jp.ones((self.sys.nu,))
 
-        last_filtered_rpm_proxy = jp.ones((self.sys.nu,))
+        last_filtered_rpm_proxy = jp.clip(1-jp.abs(0.5*jax.random.normal(rng, shape=(self.sys.nu,))), 0, 1)
 
         rng, nk = jax.random.split(rng)
         obs = build_obs(ps, last_act, self.target_position, cfg.obs_noise, nk, self.ids, payload=cfg.payload)
