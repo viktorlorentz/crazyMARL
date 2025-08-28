@@ -199,12 +199,13 @@ class MultiQuadEnv(PipelineEnv):
         r_prev = state.metrics['filtered_rpm_proxy']
         filtered_rpm_proxy = r_prev + alpha * (rpm_proxy - r_prev)
 
-        filtered_thrust = jp.square(filtered_rpm_proxy)  # convert back to thrust
+        #filtered_thrust = jp.square(filtered_rpm_proxy)  # convert back to thrust
+        filtered_thrust = jp.square(rpm_proxy)
 
         # Build disturbance xfrc for this step
         ps_in = state.pipeline_state
-        #xfrc_step = self._build_disturbance_xfrc(ps_in)
-        #ps_in = ps_in.replace(xfrc_applied=xfrc_step)
+        xfrc_step = self._build_disturbance_xfrc(ps_in)
+        ps_in = ps_in.replace(xfrc_applied=xfrc_step)
 
         # Step physics with disturbance
         ps = self.pipeline_step(ps_in, filtered_thrust)
