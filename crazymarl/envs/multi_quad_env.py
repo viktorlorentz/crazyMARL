@@ -171,9 +171,9 @@ class MultiQuadEnv(PipelineEnv):
             qpos = qpos.at[s+3:s+7].set(quats[i])
 
         ps = self.pipeline_init(qpos, qvel)
-        last_act = jp.zeros((self.sys.nu,))
+        last_act = jp.ones((self.sys.nu,))
 
-        last_filtered_rpm_proxy = jp.zeros((self.sys.nu,))
+        last_filtered_rpm_proxy = jp.ones((self.sys.nu,))
 
         rng, nk = jax.random.split(rng)
         obs = build_obs(ps, last_act, self.target_position, cfg.obs_noise, nk, self.ids, payload=cfg.payload)
