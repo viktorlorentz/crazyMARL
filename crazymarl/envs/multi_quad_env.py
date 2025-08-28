@@ -55,8 +55,8 @@ class MultiQuadEnv(PipelineEnv):
         # Bias torque toward yaw (body z-axis in world frame)
         self.torque_yaw_bias_kappa = 6.0   # larger => stronger alignment with yaw axis
         self.torque_yaw_noise_std = 1.0    # noise around yaw axis
-
-        
+        # Add payload disturbance force range (reuses quad range by default)
+        self.payload_disturbance_force_range = (0.0, 0.05) # Newtons
 
 
     def _build_disturbance_xfrc(self, ps_in):
@@ -65,7 +65,8 @@ class MultiQuadEnv(PipelineEnv):
         dk = jax.random.fold_in(dk, jp.int32(ps_in.time * 1e6))
         dk = jax.random.fold_in(dk, jp.int32(jp.sum(ps_in.xpos) * 1e3))
         dk = jax.random.fold_in(dk, jp.int32(jp.sum(ps_in.cvel) * 1e3))
-        dk, k_evt, k_body, k_fdir, k_fmag, k_tdir, k_tmag = jax.random.split(dk, 7)
+        # Extend splits to include payload disturbance keys
+        dk, k_evt, k_body, k_fdir, k_fmag, k_tdir, k_tmag, k_evt_pl, k_fdir_pl, k_fmag_pl = jax.random.split(dk, 10)
 
         # Event probability => expected one every disturbance_interval_s seconds
         p_event = jp.clip(self.time_per_action / self.disturbance_interval_s, 0.0, 1.0)
@@ -105,16 +106,31 @@ class MultiQuadEnv(PipelineEnv):
         xfrc_step = jp.zeros_like(ps_in.xfrc_applied)
         xfrc_vec = jp.concatenate([force_w, torque_w]) * event_f
         xfrc_step = xfrc_step.at[body_id].set(xfrc_vec)
+
+        # Payload disturbance
+        if self.cfg.payload and "payload_body_id" in self.ids:
+            p_event_pl = jp.clip(self.time_per_action / (2 * self.disturbance_interval_s), 0.0, 1.0)
+            event_pl = jax.random.bernoulli(k_evt_pl, p=p_event_pl).astype(jp.float32)
+            f_dir_raw_pl = jax.random.normal(k_fdir_pl, (3,))
+            f_dir_pl = f_dir_raw_pl / (jp.linalg.norm(f_dir_raw_pl) + 1e-6)
+            f_mag_pl = jax.random.uniform(
+                k_fmag_pl, (), 
+                minval=self.payload_disturbance_force_range[0],
+                maxval=self.payload_disturbance_force_range[1]
+            )
+            force_pl = f_dir_pl * f_mag_pl * event_pl
+            # Add force (first 3 comps) to payload; torque left zero
+            xfrc_step = xfrc_step.at[self.ids["payload_body_id"], :3].add(force_pl)
         return xfrc_step
 
     def reset(self, rng: jax.Array) -> State:
         cfg = self.cfg
         rng, mt_rng = jax.random.split(rng)
         motor_offsets = 0.05 * cfg.max_thrust_range * ( jax.random.normal(mt_rng, (self.sys.nu,)))
-        max_thrust = jax.random.uniform(mt_rng, minval=0.11, maxval=0.13)
+        max_thrust = jax.random.uniform(mt_rng, minval=0.11, maxval=0.135)
         max_thrust += motor_offsets
 
-        max_thrust = jp.clip(max_thrust, 0.105, 0.14) 
+        max_thrust = jp.clip(max_thrust, 0.10, 0.14) 
 
         rng, r1, r2, rc = jax.random.split(rng, 4)
         base_qpos = self.sys.qpos0
