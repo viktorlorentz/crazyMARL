@@ -158,7 +158,6 @@ class MultiQuadEnv(PipelineEnv):
         quats = jp.stack(quats)
 
         tau = cfg.motor_tau * jp.clip(1 + jax.random.normal(rng, ()) * 0.2, 0.3, 1.3)
-        tau = 0.0001
         motor_alpha = self.dt / tau
 
         qpos = base_qpos
@@ -198,7 +197,9 @@ class MultiQuadEnv(PipelineEnv):
         rpm_proxy = jp.sqrt(action_scaled)  # we use sqrt of thrust as a proxy for rotor speed
         r_prev = state.metrics['filtered_rpm_proxy']
         filtered_rpm_proxy = r_prev + alpha * (rpm_proxy - r_prev)
-        filtered_thrust = jp.square(filtered_rpm_proxy)  # convert back to thrust
+
+        filtered_thrust =  jp.square(rpm_proxy)
+        #filtered_thrust = jp.square(filtered_rpm_proxy)  # convert back to thrust
 
         # Build disturbance xfrc for this step
         ps_in = state.pipeline_state
