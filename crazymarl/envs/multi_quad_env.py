@@ -199,8 +199,7 @@ class MultiQuadEnv(PipelineEnv):
         r_prev = state.metrics['filtered_rpm_proxy']
         filtered_rpm_proxy = r_prev + alpha * (rpm_proxy - r_prev)
 
-        filtered_thrust =  jp.square(rpm_proxy)
-        #filtered_thrust = jp.square(filtered_rpm_proxy)  # convert back to thrust
+        filtered_thrust = jp.square(filtered_rpm_proxy)  # convert back to thrust
 
         # Build disturbance xfrc for this step
         ps_in = state.pipeline_state
