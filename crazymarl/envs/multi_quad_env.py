@@ -169,9 +169,16 @@ class MultiQuadEnv(PipelineEnv):
             qpos = qpos.at[s+3:s+7].set(quats[i])
 
         ps = self.pipeline_init(qpos, qvel)
-        last_act = jp.ones((self.sys.nu,))
+        last_act = -jp.ones((self.sys.nu,))
 
-        last_filtered_rpm_proxy = jp.clip(1-jp.abs(0.1*jax.random.normal(rng, shape=(self.sys.nu,))), 0, 1)
+        last_filtered_rpm_proxy = jp.clip(0.85+0.1*jax.random.normal(rng, shape=(self.sys.nu,)), 0, 1)
+        
+        # Zero RPM proxy for any quad whose initial z position is on the ground (< 0.02)
+        motors_per_quad = self.sys.nu // self.num_quads
+        grounded = quad_pos[:, 2] < 0.02                          # (num_quads,)
+        lfrp = last_filtered_rpm_proxy.reshape((self.num_quads, motors_per_quad))
+        lfrp = jp.where(grounded[:, None], 0.0, lfrp)
+        last_filtered_rpm_proxy = lfrp.reshape((-1,))
 
         rng, nk = jax.random.split(rng)
         obs = build_obs(ps, last_act, self.target_position, cfg.obs_noise, nk, self.ids, payload=cfg.payload)

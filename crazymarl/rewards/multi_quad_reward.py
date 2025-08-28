@@ -106,6 +106,7 @@ def calc_reward(
     #smoothness_bonus = jp.mean(er(per_quad_action_diff, 50)) + jp.mean(er(per_quad_thrust_deviations, 50)) 
     smooth_penalty =  0.5*(action_diff + thrust_deviations) # - smoothness_bonus
     smooth_penalty  *= cfg.reward_coeffs["smooth_action_coef"] 
+    smooth_penalty = jp.where(sim_time < 0.15, 0.0, smooth_penalty) # Force smooth_penalty = 0 for first 150 ms
 
     thrust_cmds = 0.5 * (actions + 1.0)
     thrust_extremes = jp.exp(-50 * jp.abs(thrust_cmds)) + jp.exp(50 * (thrust_cmds - 1)) # 1 if thrust_cmds is 0 or 1 and going to 0 in the middle
