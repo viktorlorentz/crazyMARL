@@ -7,7 +7,7 @@ class MultiQuadConfig:
     # Simulation and policy parameters
     policy_freq: float = 250.0
     sim_steps_per_action: int = 1
-    episode_length: int = 2048  # Number of steps per episode
+    episode_length: int = 3072  # Number of steps per episode
 
     # Noise parameters
     obs_noise: float = 0.0

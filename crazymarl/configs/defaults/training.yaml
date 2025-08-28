@@ -18,7 +18,7 @@ training:
     act_noise: 0.0
     max_thrust_range: 0.15
     num_quads: 2
-    episode_length: 2048
+    episode_length: 3072
     cable_length: 0.4
     payload: true
     payload_mass: 0.01
