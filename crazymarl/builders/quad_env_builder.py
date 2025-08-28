@@ -60,7 +60,7 @@ class QuadEnvGenerator:
         print(f"  Cable Length: {self.cable_length} m")
         print(f"  Tendon Width: {self.tendon_width} m")
         print(f"  Payload Height: {self.payload_height} m")
-        print(f"  Payload Mass: {self.payload_mass} kg")
+        print(f"  Payload Mass: {float(self.payload_mass)*1000} g")
         print(f"  Frame Radius: {self.frame_radius} m")
         print(f"  Mesh Directory: {self.mesh_dir}")
                
