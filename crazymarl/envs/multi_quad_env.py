@@ -111,7 +111,7 @@ class MultiQuadEnv(PipelineEnv):
         cfg = self.cfg
         rng, mt_rng = jax.random.split(rng)
         motor_offsets = 0.05 * cfg.max_thrust_range * ( jax.random.normal(mt_rng, (self.sys.nu,)))
-        max_thrust = self.base_max_thrust
+        max_thrust = jax.random.uniform(mt_rng, minval=0.11, maxval=0.13)
         max_thrust += motor_offsets
 
         max_thrust = jp.clip(max_thrust, 0.105, 0.14) 
