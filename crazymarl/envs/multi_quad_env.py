@@ -56,7 +56,7 @@ class MultiQuadEnv(PipelineEnv):
         self.torque_yaw_bias_kappa = 6.0   # larger => stronger alignment with yaw axis
         self.torque_yaw_noise_std = 1.0    # noise around yaw axis
         # Add payload disturbance force range (reuses quad range by default)
-        self.payload_disturbance_force_range = (0.0, 0.05) # Newtons
+        self.payload_disturbance_force_range = (0.0, 0.2) # Newtons
 
 
     def _build_disturbance_xfrc(self, ps_in):
