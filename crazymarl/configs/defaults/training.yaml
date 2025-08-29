@@ -27,7 +27,7 @@ training:
     sim_steps_per_action: 1
   TOTAL_TIMESTEPS: 1000000000
   NUM_ENVS: 16384
-  NUM_STEPS: 128
+  NUM_STEPS: 256
   NUM_MINIBATCHES: 256
   UPDATE_EPOCHS: 8
   ANNEAL_LR: false
