@@ -14,7 +14,8 @@ def calc_reward(
     target_position: jp.ndarray,
     data,
     max_thrust: float,
-    cfg
+    cfg,
+    dynamic: jp.ndarray  # 1=recent disturbance, 0=static
 ) -> jp.ndarray:
     """
     Compute the scalar reward combining tracking, stability, safety, and penalties.
@@ -107,6 +108,8 @@ def calc_reward(
     smooth_penalty =  0.5*(action_diff + thrust_deviations) # - smoothness_bonus
     smooth_penalty  *= cfg.reward_coeffs["smooth_action_coef"] 
     smooth_penalty = jp.where(sim_time < 0.15, 0.0, smooth_penalty) # Force smooth_penalty = 0 for first 150 ms
+    # Scale by (1 - dynamic): full penalty when static (dynamic≈0), suppressed when dynamic≈1
+    smooth_penalty *= (1.0 - jp.clip(dynamic, 0.0, 1.0))
 
     thrust_cmds = 0.5 * (actions + 1.0)
     thrust_extremes = jp.exp(-50 * jp.abs(thrust_cmds)) + jp.exp(50 * (thrust_cmds - 1)) # 1 if thrust_cmds is 0 or 1 and going to 0 in the middle

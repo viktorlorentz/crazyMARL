@@ -38,6 +38,7 @@ class MultiQuadEnv(PipelineEnv):
         self.cfg = cfg
        
         self.time_per_action = 1.0 / cfg.policy_freq
+        self.dynamic_decay_tau = 0.075 # roughly 0 after 300ms
         self.base_max_thrust = 0.12
         self.goal_center = jp.array([0.0, 0.0, 1.5])
         self.target_position = self.goal_center
@@ -121,7 +122,9 @@ class MultiQuadEnv(PipelineEnv):
             force_pl = f_dir_pl * f_mag_pl * event_pl
             # Add force (first 3 comps) to payload; torque left zero
             xfrc_step = xfrc_step.at[self.ids["payload_body_id"], :3].add(force_pl)
-        return xfrc_step
+        # Disturbance flag: 1 if any non-zero wrench applied
+        disturbance_flag = (jp.sum(jp.abs(xfrc_step)) > 0).astype(jp.float32)
+        return xfrc_step, disturbance_flag
 
     def reset(self, rng: jax.Array) -> State:
         cfg = self.cfg
@@ -200,10 +203,11 @@ class MultiQuadEnv(PipelineEnv):
         obs = build_obs(ps, last_act, self.target_position, cfg.obs_noise, nk, self.ids, payload=cfg.payload)
         return State(ps, obs, jp.array(0.0), jp.array(0.0), 
                      {'time': ps.time,
-                      'reward': 0.0, 
+                      'reward': 0.0,
                       'max_thrust': max_thrust,
                       'filtered_rpm_proxy': last_filtered_rpm_proxy,
-                      'motor_alpha': motor_alpha
+                      'motor_alpha': motor_alpha,
+                      'dynamic': 1.1
                         })
 
     def step(self, state: State, action: jax.Array) -> State:
@@ -227,7 +231,7 @@ class MultiQuadEnv(PipelineEnv):
 
         # Build disturbance xfrc for this step
         ps_in = state.pipeline_state
-        xfrc_step = self._build_disturbance_xfrc(ps_in)
+        xfrc_step, disturbance_flag = self._build_disturbance_xfrc(ps_in)
         ps_in = ps_in.replace(xfrc_applied=xfrc_step)
 
         # Step physics with disturbance
@@ -299,7 +303,17 @@ class MultiQuadEnv(PipelineEnv):
 
 
         obs = build_obs(ps, action, target_position, cfg.obs_noise, noise_key, self.ids, payload=cfg.payload)
-        reward = calc_reward(obs, ps.time, collision, out_of_bounds, action, angles, target_position, ps, max_thrust, cfg)
+       
+        # Exponential decay with reset on disturbance
+        prev_dynamic = state.metrics['dynamic']
+        decay = jp.exp(-self.time_per_action / self.dynamic_decay_tau)
+        dynamic_metric = jp.where(disturbance_flag > 0.0, 1.1, prev_dynamic * decay)
+        
+
+        reward = calc_reward(
+            obs, ps.time, collision, out_of_bounds, action, angles, target_position,
+            ps, max_thrust, cfg, dynamic_metric
+        )
 
         # dont terminate ground collision on ground start
         if cfg.payload:
@@ -329,6 +343,7 @@ class MultiQuadEnv(PipelineEnv):
             'max_thrust': state.metrics['max_thrust'],
             'filtered_rpm_proxy': filtered_rpm_proxy,
             'motor_alpha': state.metrics['motor_alpha'],
+            'dynamic': dynamic_metric,
         }
         return state.replace(pipeline_state=ps, obs=obs, reward=reward, done=done, metrics=metrics)
 
