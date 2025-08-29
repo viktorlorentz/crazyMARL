@@ -51,9 +51,10 @@ def build_obs(
     qds = jnp.array(ids["quad_dofadr"], dtype=int)  # (Q,)
     linvels = vmap(lambda d: lax.dynamic_slice(data.qvel, (d,), (3,)))(qds)
 
-    # extract ang vel from gyro sensor
+    # angular velocity
     gyro = data.sensordata
-    angvels = vmap(lambda d: lax.dynamic_slice(gyro, (d,), (3,)))(qds)
+    gyro_adrs = jnp.array(ids["gyro_sensor_adrs"], dtype=int)  # (Q,)
+    angvels = vmap(lambda a: lax.dynamic_slice(gyro, (a,), (3,)))(gyro_adrs)
     
     # zero angvels
     #angvels = jnp.zeros_like(angvels)

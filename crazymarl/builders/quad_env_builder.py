@@ -334,15 +334,24 @@ def get_body_and_joint_ids(sys, num_quads):
     payload_qpos_start = model.jnt_qposadr[payload_joint_id]
     payload_dofadr     = model.jnt_dofadr[payload_joint_id]          
 
+    # Gyro sensor ids and their data start addresses
+    gyro_sensor_ids = [
+        mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SENSOR.value, f"q{i}_gyro")
+        for i in range(num_quads)
+    ]
+    gyro_sensor_adrs = [model.sensor_adr[sid] for sid in gyro_sensor_ids]
+
     return {
         "quad_body_ids":      quad_body_ids,
         "quad_joint_ids":     quad_joint_ids,
         "quad_qpos_starts":   quad_qpos_starts,
-        "quad_dofadr":        quad_dofadr,          
+        "quad_dofadr":        quad_dofadr,
         "payload_body_id":    payload_body_id,
         "payload_joint_id":   payload_joint_id,
         "payload_qpos_start": payload_qpos_start,
-        "payload_dofadr":     payload_dofadr,       
+        "payload_dofadr":     payload_dofadr,
+        "gyro_sensor_ids":    gyro_sensor_ids,
+        "gyro_sensor_adrs":   gyro_sensor_adrs,
     }
 
 # def compute_obs_table(n):
