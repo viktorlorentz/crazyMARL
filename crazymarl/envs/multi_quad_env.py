@@ -173,9 +173,9 @@ class MultiQuadEnv(PipelineEnv):
             ]))
         quats = jp.stack(quats)
 
-        #tau = cfg.motor_tau * jp.clip(1 + jax.random.normal(rng, ()) * 0.3, 0.1, 1.5)
+        tau = cfg.motor_tau * jp.clip(1 + jax.random.normal(rng, ()) * 0.3, 0.1, 1.5)
 
-        motor_alpha = 1 #self.dt / tau
+        motor_alpha = self.dt / tau
 
         qpos = base_qpos
         if cfg.payload:
