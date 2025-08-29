@@ -2,7 +2,7 @@ training:
   ENV_KWARGS:
     num_quads: 1
     cable_length: 0.45
-    payload_mass: 0.005 #5g
+    payload_mass: 0.006 #6g
     obs_noise: 1.0
     reward_coeffs:
       distance_reward_coef: 1.0

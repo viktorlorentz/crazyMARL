@@ -200,7 +200,7 @@ class QuadEnvGenerator:
                 "name": f"q{i}_cf2", "childclass": "cf2", "pos": "0 0 -0.0015"
             })
             ET.SubElement(cf2, "inertial", {
-                "pos": "0 0 0", "mass": "0.0365",
+                "pos": "0 0 0", "mass": "0.0335",
                 "diaginertia": "1.65717e-05 1.66556e-05 2.92617e-05"
             })
             # visual & collision
