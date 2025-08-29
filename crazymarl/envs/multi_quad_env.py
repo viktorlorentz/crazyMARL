@@ -58,6 +58,9 @@ class MultiQuadEnv(PipelineEnv):
         self.torque_yaw_noise_std = 1.0    # noise around yaw axis
         # Add payload disturbance force range (reuses quad range by default)
         self.payload_disturbance_force_range = (0.0, 5.0) # Newtons
+        # Random RPM jump config (average one event per second)
+        self.rpm_jump_interval_s = 1.0
+        self.rpm_jump_std = 0.05  # std of additive jump in filtered RPM proxy units
 
 
     def _build_disturbance_xfrc(self, ps_in):
@@ -336,6 +339,13 @@ class MultiQuadEnv(PipelineEnv):
     
         
         done = done * 1.0
+
+        # Apply random RPM jump disturbance
+        p_jump = jp.clip(self.time_per_action / self.rpm_jump_interval_s, 0.0, 1.0)
+        jump_key, delta_key = jax.random.split(noise_key)
+        jump_flag = jax.random.bernoulli(jump_key, p=p_jump).astype(jp.float32)
+        jump_delta = self.rpm_jump_std * jax.random.normal(delta_key, shape=filtered_rpm_proxy.shape)
+        filtered_rpm_proxy = jp.clip(filtered_rpm_proxy + jump_flag * jump_delta, 0.0, jp.inf)
 
         metrics = {
             'time': ps.time,
