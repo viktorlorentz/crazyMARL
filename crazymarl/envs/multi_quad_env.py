@@ -50,7 +50,7 @@ class MultiQuadEnv(PipelineEnv):
         self.ids = get_body_and_joint_ids(sys, num_quads=self.num_quads)
 
         # External disturbance configuration
-        self.disturbance_interval_s = 3.0  # average one event every 2 seconds
+        self.disturbance_interval_s = 3.0  # average one event every 3 seconds
         self.disturbance_force_range = (0.0, 0.05)    # Newtons
         self.disturbance_torque_range = (0.0, 0.03)   # N·m
         # Bias torque toward yaw (body z-axis in world frame)
@@ -113,7 +113,7 @@ class MultiQuadEnv(PipelineEnv):
 
         # Payload disturbance
         if self.cfg.payload and "payload_body_id" in self.ids:
-            p_event_pl = jp.clip(self.time_per_action / self.disturbance_interval_s, 0.0, 1.0)
+            p_event_pl = jp.clip(self.time_per_action / (2 * self.disturbance_interval_s), 0.0, 1.0)
             event_pl = jax.random.bernoulli(k_evt_pl, p=p_event_pl).astype(jp.float32)
             f_dir_raw_pl = jax.random.normal(k_fdir_pl, (3,))
             f_dir_pl = f_dir_raw_pl / (jp.linalg.norm(f_dir_raw_pl) + 1e-6)
