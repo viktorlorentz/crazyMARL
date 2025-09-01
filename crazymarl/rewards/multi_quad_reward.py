@@ -48,7 +48,7 @@ def calc_reward(
         pairwise = jp.where(eye, jp.inf, d)
         # make sure the distance is positive
         pair_distance = jp.abs(pairwise) - 0.15
-        safe_distance = jp.mean(jp.clip(40 * pair_distance, 0, 1)) # encourage more than dist of 0.15m between quads and full reward for distances above 0.175m
+        safe_distance = jp.mean(jp.clip(30 * pair_distance, 0, 1)) # encourage more than dist of 0.15m between quads and full reward for distances above 0.175m
 
     else:
         safe_distance = 1.0
