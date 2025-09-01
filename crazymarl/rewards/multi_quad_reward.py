@@ -77,7 +77,7 @@ def calc_reward(
 
     ang_vel_reward  = jp.mean(er(yaw_vels)-0.1*yaw_vels**2) # penalize high yaw velocities, reward low ones
     # roll and pitch
-    ang_vel_reward += jp.mean(er(jp.linalg.norm(angvels[:, :2], axis=-1))) 
+    #ang_vel_reward += jp.mean(er(jp.linalg.norm(angvels[:, :2], axis=-1))) 
 
     # hx, hy = rots[:, 0, 0], rots[:, 1, 0]
     # cos_err = hx / jp.maximum(1e-6, jp.sqrt(hx*hx + hy*hy))
