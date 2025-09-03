@@ -132,11 +132,11 @@ class MultiQuadEnv(PipelineEnv):
     def reset(self, rng: jax.Array) -> State:
         cfg = self.cfg
         rng, mt_rng, base_rng = jax.random.split(rng, 3)
-        motor_offsets = 0.005 * (jax.random.normal(mt_rng, (self.sys.nu,)))
+        motor_offsets = 0.008 * (jax.random.normal(mt_rng, (self.sys.nu,)))
         assert self.sys.nu == 4 * self.num_quads, "Motor count mismatch"
-        base_per_quad = jax.random.uniform(base_rng,shape=(self.num_quads,),minval=0.105,maxval=0.14)
+        base_per_quad = jax.random.uniform(base_rng,shape=(self.num_quads,),minval=0.105,maxval=0.15)
         max_thrust = jp.repeat(base_per_quad, 4) + motor_offsets # base thrust per quad plus random offset
-        max_thrust = jp.clip(max_thrust, 0.095, 0.15) 
+        max_thrust = jp.clip(max_thrust, 0.095, 0.16) 
 
         rng, r1, r2, rc = jax.random.split(rng, 4)
         base_qpos = self.sys.qpos0

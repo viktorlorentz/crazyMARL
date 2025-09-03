@@ -257,7 +257,7 @@ class QuadEnvGenerator:
                     "name": f"q{i}_thrust{lbl}",
                     "class": "cf2",
                     "site": f"q{i}_thrust{lbl}",
-                    "ctrlrange": "0 0.15", # to give some room for domain randomization
+                    "ctrlrange": "0 0.16", # to give some room for domain randomization
                     "gear": f"0 0 1 0 0 {gear:.0e}"
                 })
 
