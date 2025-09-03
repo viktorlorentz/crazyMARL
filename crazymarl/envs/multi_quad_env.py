@@ -306,7 +306,7 @@ class MultiQuadEnv(PipelineEnv):
 
         # set target if trajectory is provided
         target_position = self.target_position
-        if self.trajectory is not None and self.trajectory.shape[0] > 0:
+        if isinstance(self.trajectory, jax.Array):
             # get the next target position from the trajectory
             target_idx = jp.clip(
                 jp.floor(ps.time  / self.time_per_action).astype(jp.int32),
