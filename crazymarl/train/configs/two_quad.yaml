@@ -17,5 +17,6 @@ training:
       out_of_bounds_penalty_coef: -10.0
       smooth_action_coef: -10.0
       action_energy_coef: -1.0
+    trajectory: "random"
   TOTAL_TIMESTEPS: 2000000000
   

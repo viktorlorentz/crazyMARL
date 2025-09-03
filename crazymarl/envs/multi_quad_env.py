@@ -43,10 +43,15 @@ class MultiQuadEnv(PipelineEnv):
         self.goal_center = jp.array([0.0, 0.0, 1.5])
         self.target_position = self.goal_center
         self.trajectory = None
-        if cfg.trajectory is not None:
+        if cfg.trajectory is not None and cfg.trajectory != "random":
             traj = jp.array(cfg.trajectory, dtype=jp.float32)
             self.trajectory = traj.reshape(-1,3)
             self.target_position = self.trajectory[0]
+        elif cfg.trajectory == "random":
+            # Enable stochastic waypoint updates
+            self.trajectory = "random"
+            self.target_position = self.goal_center  # start at goal center
+
         self.ids = get_body_and_joint_ids(sys, num_quads=self.num_quads)
 
         # External disturbance configuration
@@ -61,6 +66,10 @@ class MultiQuadEnv(PipelineEnv):
         # Random RPM jump config (average one event per second)
         self.rpm_jump_interval_s = 1.0
         self.rpm_jump_std = 0.05  # std of additive jump in filtered RPM proxy units
+
+        # Random target update config (for trajectory == "random")
+        self.random_target_interval = 6.0   # expected 6s between changes
+        self.random_target_std = 0.2        # meters (std dev of displacement)
 
 
     def _build_disturbance_xfrc(self, ps_in):
@@ -204,14 +213,16 @@ class MultiQuadEnv(PipelineEnv):
 
         rng, nk = jax.random.split(rng)
         obs = build_obs(ps, last_act, self.target_position, cfg.obs_noise, nk, self.ids, payload=cfg.payload)
-        return State(ps, obs, jp.array(0.0), jp.array(0.0), 
-                     {'time': ps.time,
-                      'reward': 0.0,
-                      'max_thrust': max_thrust,
-                      'filtered_rpm_proxy': last_filtered_rpm_proxy,
-                      'motor_alpha': motor_alpha,
-                      'dynamic': 1.1
-                        })
+        metrics = {
+            'time': ps.time,
+            'reward': 0.0,
+            'max_thrust': max_thrust,
+            'filtered_rpm_proxy': last_filtered_rpm_proxy,
+            'motor_alpha': motor_alpha,
+            'dynamic': 1.1,
+            'target_position': self.target_position,  
+        }
+        return State(ps, obs, jp.array(0.0), jp.array(0.0), metrics)
 
     def step(self, state: State, action: jax.Array) -> State:
         cfg = self.cfg
@@ -302,7 +313,18 @@ class MultiQuadEnv(PipelineEnv):
                 0, self.trajectory.shape[0] - 1
             ) 
             target_position = self.trajectory[target_idx]
-
+        elif self.trajectory == "random":
+            # Stochastic target updates around goal_center
+            prev_target = state.metrics['target_position']
+            # Split keys: event, displacement, remaining for obs noise
+            evt_key, disp_key, noise_key = jax.random.split(noise_key, 3)
+            p_new = jp.clip(self.time_per_action / self.random_target_interval, 0.0, 1.0)
+            new_evt = jax.random.bernoulli(evt_key, p=p_new).astype(jp.float32)
+            disp = jax.random.normal(disp_key, (3,)) * self.random_target_std
+            #clip at 1m
+            disp = jp.clip(disp, -1.0, 1.0)
+            candidate = self.goal_center + disp
+            target_position = new_evt * candidate + (1.0 - new_evt) * prev_target
 
 
         obs = build_obs(ps, action, target_position, cfg.obs_noise, noise_key, self.ids, payload=cfg.payload)
@@ -354,6 +376,7 @@ class MultiQuadEnv(PipelineEnv):
             'filtered_rpm_proxy': filtered_rpm_proxy,
             'motor_alpha': state.metrics['motor_alpha'],
             'dynamic': dynamic_metric,
+            'target_position': target_position,
         }
         return state.replace(pipeline_state=ps, obs=obs, reward=reward, done=done, metrics=metrics)
 
