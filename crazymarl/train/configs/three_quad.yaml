@@ -1,14 +1,14 @@
 training:
   ENV_KWARGS:
     num_quads: 3
-    cable_length: 0.35
+    cable_length: 0.4
     payload_mass: 0.01 #10g
     obs_noise: 1.0
     reward_coeffs:
       distance_reward_coef: 1.0
       velocity_reward_coef: 1.0
       safe_distance_coef: 1.0
-      up_reward_coef: 10.0
+      up_reward_coef: 20.0
       linvel_reward_coef: 1.0
       ang_vel_reward_coef: 10.0
       linvel_quad_reward_coef: 1.0
