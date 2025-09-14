@@ -18,11 +18,11 @@ training:
       smooth_action_coef: -10.0
       action_energy_coef: -1.0
     trajectory: "random"
-  TOTAL_TIMESTEPS: 500000000
-  NUM_ENVS: 1024
+  TOTAL_TIMESTEPS: 50000000
+  NUM_ENVS: 512
   NUM_STEPS: 128
-  NUM_MINIBATCHES: 32
-  UPDATE_EPOCHS: 8
+  NUM_MINIBATCHES: 8
+  UPDATE_EPOCHS: 4
   ANNEAL_LR: false
   LR: 0.0004
   ACTIVATION: tanh
