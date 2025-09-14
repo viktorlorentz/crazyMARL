@@ -1,0 +1,48 @@
+training:
+  ENV_KWARGS:
+    num_quads: 2
+    cable_length: 0.35
+    payload_mass: 0.01 #10g
+    obs_noise: 1.0
+    reward_coeffs:
+      distance_reward_coef: 1.0
+      velocity_reward_coef: 1.0
+      safe_distance_coef: 1.0
+      up_reward_coef: 5.0
+      linvel_reward_coef: 1.0
+      ang_vel_reward_coef: 10.0
+      linvel_quad_reward_coef: 1.0
+      taut_reward_coef: 1.0
+      collision_penalty_coef: -20.0
+      out_of_bounds_penalty_coef: -10.0
+      smooth_action_coef: -10.0
+      action_energy_coef: -1.0
+    trajectory: "random"
+  TOTAL_TIMESTEPS: 500000000
+  NUM_ENVS: 1024
+  NUM_STEPS: 128
+  NUM_MINIBATCHES: 32
+  UPDATE_EPOCHS: 8
+  ANNEAL_LR: false
+  LR: 0.0004
+  ACTIVATION: tanh
+  MAX_GRAD_NORM: 0.5
+  CLIP_EPS: 0.2
+  VF_COEF: 0.5
+  ENT_COEF: 0.01
+  GAMMA: 0.997
+  GAE_LAMBDA: 0.95
+  SEED: 0
+  ACTOR_ARCH:
+    - 64
+    - 64
+    - 64
+  CRITIC_ARCH:
+    - 128
+    - 128
+    - 128
+  DISABLE_JIT: false
+  PROJECT: crazymarl
+  NAME: quad_marl
+  WANDB_MODE: online
+  
