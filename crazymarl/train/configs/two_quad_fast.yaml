@@ -3,7 +3,7 @@ training:
     num_quads: 2
     cable_length: 0.35
     payload_mass: 0.01 #10g
-    obs_noise: 1.0
+    obs_noise: 0.0
     reward_coeffs:
       distance_reward_coef: 1.0
       velocity_reward_coef: 1.0
