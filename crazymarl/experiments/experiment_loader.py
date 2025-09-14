@@ -1,6 +1,10 @@
 import asdf
 import numpy as np
+import jax 
+jax.config.update("jax_platform_name", "cpu")
 from crazymarl.observations.multi_quad_observation import get_obs_index_lookup
+
+
 
 class Experiment:
     """
