@@ -58,13 +58,19 @@ def calc_reward(
     # upright reward = mean over all quads
     up_reward = jp.mean(er(angles))
 
-    # taut-string reward = sum of distances + heights
+    # taut-string reward = sum of distances + heights with added z-axis alignment factor
     quad_dists   = jp.linalg.norm(rels, axis=-1)
     quad_heights = rels[:, 2]
+    # Penalize the magnitude of the maximum angle to the z-axis.
+    # rel_pos = quad_pos - payload_pos, so dot with z-axis is unit rel z-component.
+    rel_norms = jp.linalg.norm(rels, axis=-1)
+    unit_rels = rels / (rel_norms[:, None] + 1e-6)
+    z_alignment = jp.clip(unit_rels[:, 2], 0.0, 1.0)  # 1 when directly above, 0 when horizontal or below
+    worst_alignment = jp.min(z_alignment)  # penalize by the worst (maximum-angle) quad
     taut_reward = jp.where(
         cfg.cable_length < 0.02,
         1.0,
-        (jp.mean(quad_dists) + 5 * jp.mean(quad_heights)) / cfg.cable_length
+        worst_alignment * ((jp.mean(quad_dists) + 5 * jp.mean(quad_heights)) / cfg.cable_length)
     )
 
     # angular & linear velocity
