@@ -65,7 +65,7 @@ def calc_reward(
     # rel_pos = quad_pos - payload_pos, so dot with z-axis is unit rel z-component.
 
     force_upness_payload = quad_heights / cfg.cable_length
-    min_force_upness_penalty = 10 * (1-jp.minimum(force_upness_payload))**6 
+    min_force_upness_penalty = 10 * (1-jp.min(force_upness_payload))**6 
     #this penalizes if the force vector is not pointing upwards
 
     taut_reward = jp.where(
