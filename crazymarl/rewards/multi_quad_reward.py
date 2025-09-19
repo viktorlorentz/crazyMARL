@@ -63,14 +63,15 @@ def calc_reward(
     quad_heights = rels[:, 2]
     # Penalize the magnitude of the maximum angle to the z-axis.
     # rel_pos = quad_pos - payload_pos, so dot with z-axis is unit rel z-component.
-    rel_norms = jp.linalg.norm(rels, axis=-1)
-    unit_rels = rels / (rel_norms[:, None] + 1e-6)
-    z_alignment = jp.clip(unit_rels[:, 2], 0.0, 1.0)  # 1 when directly above, 0 when horizontal or below
-    worst_alignment = jp.min(z_alignment)  # penalize by the worst (maximum-angle) quad
+
+    force_upness_payload = quad_heights / cfg.cable_length
+    min_force_upness_penalty = 10 * (1-jp.minimum(force_upness_payload))**6 
+    #this penalizes if the force vector is not pointing upwards
+
     taut_reward = jp.where(
         cfg.cable_length < 0.02,
         1.0,
-        worst_alignment * ((jp.mean(quad_dists) + 5 * jp.mean(quad_heights)) / cfg.cable_length)
+        0.5 * (jp.mean(quad_dists)/ cfg.cable_length + jp.mean(force_upness_payload)) + min_force_upness_penalty
     )
 
     # angular & linear velocity
