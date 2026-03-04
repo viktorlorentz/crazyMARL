@@ -2,6 +2,22 @@ import argparse
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
+
+try:
+    import jax
+    jax.config.update("jax_platform_name", "cpu")
+except ImportError:
+    pass
+
+try:
+    import mpl_fontkit as fk
+    fk.install("Inter")
+    fk.set_font("Inter")
+except ImportError:
+    fk = None
+textwidth = 2*3.4127
+color_array = sns.color_palette("muted", 10)
 
 import cfusdlog
 
@@ -104,70 +120,82 @@ def main():
         print(f"Event '{event_name}' has no variables.")
         return
 
-    # First up to three "columns"
-    to_plot = vars_excl_ts[24:28]
-
     t = _time_to_seconds(event["timestamp"])
+    mask_15s = t <= 15.0
+    if not np.any(mask_15s):
+        print("No samples at or before 15s; nothing to plot.")
+        return
+    t = t[mask_15s]
 
-    # Optional XY/ZX plot from indata (payload_pos_err + ctrl_target_Z)
-    if args.xy_zx:
-        ff_name = "fixedFrequency" if "fixedFrequency" in data else event_name
-        ev_ff = data[ff_name]
-
-        # payload_pos_err_clamped: ctrlrl.in0..2
-        err_keys = [f"ctrlrl.in{i}" for i in (0, 1, 2)]
-        err_ok = all(k in ev_ff for k in err_keys)
-        if not err_ok:
-            print("XY/ZX: missing ctrlrl.in0..2 for payload_pos_err_clamped.")
-        # ctrl_target_Z: updated explicit keys (ctrltargetZ.*), else ctrlrl.in31..33
-        tgt_keys_explicit = ["ctrltargetZ.x", "ctrltargetZ.y", "ctrltargetZ.z"]
-        tgt_keys_in = [f"ctrlrl.in{i}" for i in (31, 32, 33)]
-        if all(k in ev_ff for k in tgt_keys_explicit):
-            tgt_keys = tgt_keys_explicit
-        elif all(k in ev_ff for k in tgt_keys_in):
-            tgt_keys = tgt_keys_in
+    err_keys = [f"ctrlrl.in{i}" for i in range(3)]
+    err_norm = None
+    steady_state_rmse = None
+    settled_window = (2.5, 11.4)
+    if all(k in event for k in err_keys):
+        err = np.vstack([event[k] for k in err_keys]).T[mask_15s]
+        err_norm = np.linalg.norm(err, axis=1)
+        mask = (t >= settled_window[0]) & (t <= settled_window[1])
+        if np.any(mask):
+            steady_state_rmse = float(np.sqrt(np.mean(err_norm[mask] ** 2)))
         else:
-            tgt_keys = None
-            print("XY/ZX: missing target keys (either ctrltargetZ.{x,y,z} or ctrlrl.in31..33).")
+            print("Error norm: no samples between 2.5s and 11s; skipping settled stats.")
+    else:
+        print("Error norm: missing ctrlrl.in0..2; skipping payload error plot.")
 
-        if err_ok and tgt_keys is not None:
-            err = np.vstack([ev_ff[k] for k in err_keys]).T
-            tgt = np.vstack([ev_ff[k] for k in tgt_keys]).T
-            pos = err + tgt  # payload position from indata
+    z_target_key = next((k for k in ("ctrltargetZ.z", "ctrlrl.in33") if k in event), None)
+    z_target = (event[z_target_key][mask_15s] / 1000) if z_target_key else None
+    if z_target is None:
+        print("RMSE: missing target Z key; skipping target plot.")
 
-            fig2, (ax_xy, ax_zx) = plt.subplots(2, 1, sharex=False, figsize=(10, 6))
-            ax_xy.plot(pos[:, 0], pos[:, 1], label="payload XY")
-            ax_xy.set_xlabel("X [m]")
-            ax_xy.set_ylabel("Y [m]")
-            ax_xy.set_aspect('equal', 'box')
-            ax_xy.grid(True)
-            ax_xy.legend()
+    rmse_axis_needed = err_norm is not None or z_target is not None
+    if not rmse_axis_needed:
+        print("No RMSE or Z target data to plot.")
+        return
 
-            ax_zx.plot(pos[:, 0], pos[:, 2], label="payload ZX")
-            ax_zx.set_xlabel("X [m]")
-            ax_zx.set_ylabel("Z [m]")
-            ax_zx.set_aspect('equal', 'box')
-            ax_zx.grid(True)
-            ax_zx.legend()
+    fig, ax_err = plt.subplots(figsize=(textwidth, textwidth * 0.25), layout="constrained")
+    ax_err.axvspan(
+        settled_window[0],
+        settled_window[1],
+        color=color_array[4],
+        alpha=0.08,
+        label="Steady-state window",
+        zorder=0,
+    )
+    if err_norm is not None:
+        ax_err.plot(t, err_norm, label="‖e‖ [m]", color=color_array[0], zorder=2)
+    if steady_state_rmse is not None:
+        ax_err.hlines(
+            steady_state_rmse,
+            settled_window[0],
+            settled_window[1],
+            colors=[color_array[2]],
+            label=f"Steady-state RMSE ({steady_state_rmse:.3f} m)",
+            linewidth=1.5,
+            zorder=3,
+        )
+    if z_target is not None:
+        ax_err.plot(
+            t,
+            z_target,
+            label="Target $z$",
+            color=color_array[3],
+            linestyle="--",
+            linewidth=1.0,
+            zorder=10,
+        )
+    ax_err.set_ylabel("m")
+    ax_err.set_xlabel("time [s]")
+    ax_err.grid(True)
+    ax_err.legend()
 
-            fig2.suptitle(f"{os.path.basename(args.file_usd)} - payload XY/ZX from indata")
-            plt.tight_layout()
+    base_name = os.path.splitext(os.path.basename(args.file_usd))[0]
+    plt.savefig(
+        f"{base_name}_takeoff_land_plot.png",
+        dpi=300,
+        bbox_inches="tight",
+        pad_inches=0.05,
+    )
 
-    nrows = len(to_plot)
-    fig, axes = plt.subplots(nrows, 1, sharex=True, figsize=(10, 5))
-    if nrows == 1:
-        axes = [axes]
-
-    for ax, var in zip(axes, to_plot):
-        ax.plot(t, event[var], label=var)
-        ax.set_ylabel(var)
-        ax.grid(True)
-        ax.legend()
-
-    title = f"{os.path.basename(args.file_usd)} - {event_name} (first three columns)"
-    fig.suptitle(title)
-    axes[-1].set_xlabel("time [s]")
-    plt.tight_layout()
     plt.show()
 
 
